@@ -1,0 +1,47 @@
+atlassian_sampling:
+  max_traces: 100
+  decision_cache:
+    sampled_cache_size: 1000
+    non_sampled_cache_size: 10000
+  policies:
+    [
+      {
+        name: test-policy-1,
+        type: probabilistic,
+        probabilistic: {hash_salt: "custom-salt", sampling_percentage: 0.1}
+      },
+      {
+        name: test-policy-2,
+        type: and,
+        and: {
+          and_sub_policy:
+            [
+              {
+                name: test-sub-policy-1,
+                type: probabilistic,
+                probabilistic: {sampling_percentage: 0}
+              },
+              {
+                name: test-sub-policy-2,
+                type: probabilistic,
+                probabilistic: {sampling_percentage: 100.0}
+              },
+            ]
+        }
+      },
+      {
+        name: test-policy-3,
+        type: span_count,
+        span_count: {min_spans: 0}
+      },
+      {
+        name: test-policy-4,
+        type: root_spans,
+        root_spans: {
+          sub_policy: {
+            type: probabilistic,
+            probabilistic: { sampling_percentage: 0 }
+          }
+        }
+      }
+    ]

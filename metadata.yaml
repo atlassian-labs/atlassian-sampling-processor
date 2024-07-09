@@ -1,0 +1,77 @@
+#file: noinspection YAMLSchemaValidation
+type: atlassian_sampling
+
+status:
+  class: processor
+  stability:
+    alpha: [traces]
+  distributions: [atlassian]
+
+tests:
+
+telemetry:
+  level: normal
+  metrics:
+    processor_atlassian_sampling_traces_sampled:
+      enabled: true
+      description: Number of traces sampled
+      unit: "{traces}"
+      sum:
+        value_type: int
+        monotonic: true
+    processor_atlassian_sampling_traces_not_sampled:
+      enabled: true
+      description: Number of traces dropped and not sampled
+      unit: "{traces}"
+      sum:
+        value_type: int
+        monotonic: true
+    processor_atlassian_sampling_spans_sampled:
+      enabled: true
+      description: Number of spans sampled
+      unit: "{spans}"
+      sum:
+        value_type: int
+        monotonic: true
+    processor_atlassian_sampling_spans_not_sampled:
+      enabled: true
+      description: Number of spans dropped and not sampled
+      unit: "{spans}"
+      sum:
+        value_type: int
+        monotonic: true
+    processor_atlassian_sampling_chan_blocking_time:
+      enabled: true
+      description: Amount of time spent blocking on the chan send in ConsumeTraces()
+      unit: ns
+      histogram:
+        value_type: int
+        bucket_boundaries: [5000, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000]
+    processor_atlassian_sampling_trace_eviction_time:
+      enabled: true
+      description: Time that a non-sampled trace was kept in memory from arrival to being evicted
+      unit: s
+      histogram:
+        value_type: double
+        bucket_boundaries: [1, 5, 10, 30, 60, 120, 240, 360, 720]
+    processor_atlassian_sampling_decision_eviction_time:
+      enabled: true
+      description: Time that a trace ID spent in the decision cache before it was evicted
+      unit: s
+      histogram:
+        value_type: double
+        bucket_boundaries: [30, 60, 120, 240, 360, 720, 1080, 1800, 3600]
+    processor_atlassian_sampling_cache_reads:
+      enabled: true
+      description: Amount of times a cache was read from
+      unit: "{accesses}"
+      sum:
+        value_type: int
+        monotonic: true
+    processor_atlassian_sampling_policy_decisions:
+      enabled: true
+      description: Sampling decisions made specifying policy and decision.
+      unit: "{decisions}"
+      sum:
+        value_type: int
+        monotonic: true
