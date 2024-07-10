@@ -2,6 +2,7 @@ package atlassiansamplingprocessor // import "bitbucket.org/atlassian/observabil
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -196,11 +197,13 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 				asp.traceData.Delete(id)
 			}
 			asp.releaseSampledTrace(ctx, td.ReceivedBatches)
+			asp.telemetry.ProcessorAtlassianSamplingTracesSampled.Add(ctx, 1)
 			return
 		case evaluators.NotSampled:
 			// Cache decision, delete any associated data
 			asp.nonSampledDecisionCache.Put(id, time.Now())
 			asp.traceData.Delete(id)
+			asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
 			return
 		default:
 			// If we have reached here, the sampling decision is still pending, so we put trace data in the cache
@@ -240,10 +243,20 @@ func (asp *atlassianSamplingProcessor) releaseSampledTrace(ctx context.Context, 
 }
 
 func (asp *atlassianSamplingProcessor) onEvictTrace(id uint64, td *tracedata.TraceData) {
+	ctx := context.Background()
 	asp.log.Debug("evicting trace from cache", zap.Uint64("traceID", id))
 	asp.telemetry.ProcessorAtlassianSamplingTraceEvictionTime.
-		Record(context.Background(), time.Since(td.ArrivalTime).Seconds())
-	// todo if a trace is evicted but isn't sampled, put on non-sampled decision cache
+		Record(ctx, time.Since(td.ArrivalTime).Seconds())
+	// Convert back to [16]byte to query. We only need the right 8-bytes from the uint64,
+	// since the cache only uses the right 8 bytes.
+	idArr := pcommon.NewTraceIDEmpty()
+	binary.LittleEndian.PutUint64(idArr[8:16], id)
+	// Double check that we didn't actually sample this trace
+	if _, ok := asp.sampledDecisionCache.Get(idArr); !ok {
+		// Mark as not sampled
+		asp.nonSampledDecisionCache.Put(idArr, time.Now())
+		asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
+	}
 }
 
 func (asp *atlassianSamplingProcessor) onEvictSampled(id uint64, insertTime time.Time) {

@@ -38,22 +38,6 @@ Sampling decisions made specifying policy and decision.
 | ---- | ----------- | ---------- | --------- |
 | {decisions} | Sum | Int | true |
 
-### processor_atlassian_sampling_spans_not_sampled
-
-Number of spans dropped and not sampled
-
-| Unit | Metric Type | Value Type | Monotonic |
-| ---- | ----------- | ---------- | --------- |
-| {spans} | Sum | Int | true |
-
-### processor_atlassian_sampling_spans_sampled
-
-Number of spans sampled
-
-| Unit | Metric Type | Value Type | Monotonic |
-| ---- | ----------- | ---------- | --------- |
-| {spans} | Sum | Int | true |
-
 ### processor_atlassian_sampling_trace_eviction_time
 
 Time that a non-sampled trace was kept in memory from arrival to being evicted

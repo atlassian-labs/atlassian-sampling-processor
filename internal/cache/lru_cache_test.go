@@ -99,6 +99,21 @@ func TestDelete(t *testing.T) {
 	assert.False(t, res)
 }
 
+func TestOnlyUsesRightHalfTraceID(t *testing.T) {
+	tb, _ := metadata.NewTelemetryBuilder(componenttest.NewNopTelemetrySettings())
+	c, err := NewLRUCache[int](5, func(uint64, int) {}, tb)
+	require.NoError(t, err)
+
+	// Same right half
+	id1, _ := traceIDFromHex("00000000000000001111111111111111")
+	id2, _ := traceIDFromHex("ffffffffffffffff1111111111111111")
+	c.Put(id1, 1)
+	c.Put(id2, 2)
+
+	res, _ := c.Get(id1)
+	assert.Equal(t, 2, res, "the put of id2 should overwrite id1's")
+}
+
 func TestZeroSizeReturnsError(t *testing.T) {
 	tb, _ := metadata.NewTelemetryBuilder(componenttest.NewNopTelemetrySettings())
 	c, err := NewLRUCache[bool](0, func(uint64, bool) {}, tb)

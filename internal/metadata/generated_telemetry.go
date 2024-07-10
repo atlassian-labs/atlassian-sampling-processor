@@ -28,8 +28,6 @@ type TelemetryBuilder struct {
 	ProcessorAtlassianSamplingChanBlockingTime     metric.Int64Histogram
 	ProcessorAtlassianSamplingDecisionEvictionTime metric.Float64Histogram
 	ProcessorAtlassianSamplingPolicyDecisions      metric.Int64Counter
-	ProcessorAtlassianSamplingSpansNotSampled      metric.Int64Counter
-	ProcessorAtlassianSamplingSpansSampled         metric.Int64Counter
 	ProcessorAtlassianSamplingTraceEvictionTime    metric.Float64Histogram
 	ProcessorAtlassianSamplingTracesNotSampled     metric.Int64Counter
 	ProcessorAtlassianSamplingTracesSampled        metric.Int64Counter
@@ -81,18 +79,6 @@ func NewTelemetryBuilder(settings component.TelemetrySettings, options ...teleme
 		"processor_atlassian_sampling_policy_decisions",
 		metric.WithDescription("Sampling decisions made specifying policy and decision."),
 		metric.WithUnit("{decisions}"),
-	)
-	errs = errors.Join(errs, err)
-	builder.ProcessorAtlassianSamplingSpansNotSampled, err = builder.meter.Int64Counter(
-		"processor_atlassian_sampling_spans_not_sampled",
-		metric.WithDescription("Number of spans dropped and not sampled"),
-		metric.WithUnit("{spans}"),
-	)
-	errs = errors.Join(errs, err)
-	builder.ProcessorAtlassianSamplingSpansSampled, err = builder.meter.Int64Counter(
-		"processor_atlassian_sampling_spans_sampled",
-		metric.WithDescription("Number of spans sampled"),
-		metric.WithUnit("{spans}"),
 	)
 	errs = errors.Join(errs, err)
 	builder.ProcessorAtlassianSamplingTraceEvictionTime, err = builder.meter.Float64Histogram(

@@ -26,20 +26,6 @@ telemetry:
       sum:
         value_type: int
         monotonic: true
-    processor_atlassian_sampling_spans_sampled:
-      enabled: true
-      description: Number of spans sampled
-      unit: "{spans}"
-      sum:
-        value_type: int
-        monotonic: true
-    processor_atlassian_sampling_spans_not_sampled:
-      enabled: true
-      description: Number of spans dropped and not sampled
-      unit: "{spans}"
-      sum:
-        value_type: int
-        monotonic: true
     processor_atlassian_sampling_chan_blocking_time:
       enabled: true
       description: Amount of time spent blocking on the chan send in ConsumeTraces()
