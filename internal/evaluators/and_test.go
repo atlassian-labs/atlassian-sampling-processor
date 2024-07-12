@@ -39,7 +39,7 @@ func TestAndEvaluatorNotSampled(t *testing.T) {
 		ReceivedBatches: traces,
 	}
 	decision, err := and.Evaluate(context.Background(), traceID, trace)
-	require.NoError(t, err, "Failed to evaluate and policy: %v", err)
+	require.NoError(t, err, "Failed to evaluate and policy: %w", err)
 	assert.Equal(t, decision, Pending)
 
 }
@@ -64,6 +64,6 @@ func TestAndEvaluatorSampled(t *testing.T) {
 		ReceivedBatches: traces,
 	}
 	decision, err := and.Evaluate(context.Background(), traceID, trace)
-	require.NoError(t, err, "Failed to evaluate and policy: %v", err)
+	require.NoError(t, err, "Failed to evaluate and policy: %w", err)
 	assert.Equal(t, decision, Sampled)
 }

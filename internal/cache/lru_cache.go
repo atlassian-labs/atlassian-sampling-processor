@@ -52,6 +52,10 @@ func (c *lruCache[V]) Delete(id pcommon.TraceID) {
 	c.cache.Remove(rightHalfTraceID(id))
 }
 
+func (c *lruCache[V]) Values() []V {
+	return c.cache.Values()
+}
+
 func rightHalfTraceID(id pcommon.TraceID) uint64 {
 	return binary.LittleEndian.Uint64(id[8:])
 }

@@ -17,4 +17,6 @@ type Cache[V any] interface {
 	Put(id pcommon.TraceID, v V)
 	// Delete deletes the value for the given id
 	Delete(id pcommon.TraceID)
+	// Values returns all values in the cache
+	Values() []V
 }

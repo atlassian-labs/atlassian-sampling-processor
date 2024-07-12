@@ -40,6 +40,18 @@ on to the decision for a longer time than you hold onto any trace data, in case 
 Keep an eye on `processor_atlassian_sampling_decision_eviction_time` to make sure that decisions are lasting an
 appropriate amount of time.
 
+### `flush_on_shutdown`
+
+This is `false` by default. When set to true, the `Shutdown()` of the component causes all traces that 
+are pending in the trace data cache to be flushed to the next consumer. This is to prevent data loss when 
+a node running this component shuts down.
+
+Before being flushed, a resource attribute `atlassiansampling.flushes` is added to the resource spans.
+This enables the downstream components to detect which resource spans have been flushed due to shut down, and
+routing them accordingly, for example using the `routingconnector`.
+Additionally, the attribute counts how many times that it's been flushed and re-ingested, 
+enabling the detection of infinite cycling.
+
 ### `policies`
 
 `policies` is a list of policies, which configure how the sampling decisions are evaluated against the incoming data.

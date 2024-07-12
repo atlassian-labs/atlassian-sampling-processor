@@ -18,12 +18,15 @@ import (
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/metadata"
 )
 
-func TestSinglePut(t *testing.T) {
+var testTelem = func() *metadata.TelemetryBuilder {
 	tb, _ := metadata.NewTelemetryBuilder(componenttest.NewNopTelemetrySettings())
-	c, err := NewLRUCache[int](2, func(uint64, int) {}, tb)
+	return tb
+}()
+
+func TestSinglePut(t *testing.T) {
+	c, err := NewLRUCache[int](2, func(uint64, int) {}, testTelem)
 	require.NoError(t, err)
-	id, err := traceIDFromHex("12341234123412341234123412341234")
-	require.NoError(t, err)
+	id := traceIDFromHex(t, "12341234123412341234123412341234")
 	c.Put(id, 123)
 	v, ok := c.Get(id)
 	assert.Equal(t, 123, v)
@@ -31,15 +34,11 @@ func TestSinglePut(t *testing.T) {
 }
 
 func TestExceedsSizeLimit(t *testing.T) {
-	tb, _ := metadata.NewTelemetryBuilder(componenttest.NewNopTelemetrySettings())
-	c, err := NewLRUCache[bool](2, func(uint64, bool) {}, tb)
+	c, err := NewLRUCache[bool](2, func(uint64, bool) {}, testTelem)
 	require.NoError(t, err)
-	id1, err := traceIDFromHex("12341234123412341234123412341231")
-	require.NoError(t, err)
-	id2, err := traceIDFromHex("12341234123412341234123412341232")
-	require.NoError(t, err)
-	id3, err := traceIDFromHex("12341234123412341234123412341233")
-	require.NoError(t, err)
+	id1 := traceIDFromHex(t, "12341234123412341234123412341231")
+	id2 := traceIDFromHex(t, "12341234123412341234123412341232")
+	id3 := traceIDFromHex(t, "12341234123412341234123412341233")
 
 	c.Put(id1, true)
 	c.Put(id2, true)
@@ -57,15 +56,11 @@ func TestExceedsSizeLimit(t *testing.T) {
 }
 
 func TestLeastRecentlyUsedIsEvicted(t *testing.T) {
-	tb, _ := metadata.NewTelemetryBuilder(componenttest.NewNopTelemetrySettings())
-	c, err := NewLRUCache[bool](2, func(uint64, bool) {}, tb)
+	c, err := NewLRUCache[bool](2, func(uint64, bool) {}, testTelem)
 	require.NoError(t, err)
-	id1, err := traceIDFromHex("12341234123412341234123412341231")
-	require.NoError(t, err)
-	id2, err := traceIDFromHex("12341234123412341234123412341232")
-	require.NoError(t, err)
-	id3, err := traceIDFromHex("12341234123412341234123412341233")
-	require.NoError(t, err)
+	id1 := traceIDFromHex(t, "12341234123412341234123412341231")
+	id2 := traceIDFromHex(t, "12341234123412341234123412341232")
+	id3 := traceIDFromHex(t, "12341234123412341234123412341233")
 
 	c.Put(id1, true)
 	c.Put(id2, true)
@@ -86,10 +81,9 @@ func TestLeastRecentlyUsedIsEvicted(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	tb, _ := metadata.NewTelemetryBuilder(componenttest.NewNopTelemetrySettings())
-	c, err := NewLRUCache[bool](2, func(uint64, bool) {}, tb)
+	c, err := NewLRUCache[bool](2, func(uint64, bool) {}, testTelem)
 	require.NoError(t, err)
-	id, _ := traceIDFromHex("12341234123412341234123412341231")
+	id := traceIDFromHex(t, "12341234123412341234123412341231")
 	c.Put(id, true)
 	_, ok := c.Get(id)
 	assert.True(t, ok)
@@ -99,14 +93,26 @@ func TestDelete(t *testing.T) {
 	assert.False(t, res)
 }
 
+func TestGetValues(t *testing.T) {
+	id1 := traceIDFromHex(t, "11111111111111111111111111111111")
+	id2 := traceIDFromHex(t, "22222222222222222222222222222222")
+	c, err := NewLRUCache[int](2, func(uint64, int) {}, testTelem)
+	require.NoError(t, err)
+
+	c.Put(id1, 1)
+	c.Put(id2, 2)
+	vals := c.Values()
+
+	assert.Equal(t, []int{1, 2}, vals)
+}
+
 func TestOnlyUsesRightHalfTraceID(t *testing.T) {
-	tb, _ := metadata.NewTelemetryBuilder(componenttest.NewNopTelemetrySettings())
-	c, err := NewLRUCache[int](5, func(uint64, int) {}, tb)
+	c, err := NewLRUCache[int](5, func(uint64, int) {}, testTelem)
 	require.NoError(t, err)
 
 	// Same right half
-	id1, _ := traceIDFromHex("00000000000000001111111111111111")
-	id2, _ := traceIDFromHex("ffffffffffffffff1111111111111111")
+	id1 := traceIDFromHex(t, "00000000000000001111111111111111")
+	id2 := traceIDFromHex(t, "ffffffffffffffff1111111111111111")
 	c.Put(id1, 1)
 	c.Put(id2, 2)
 
@@ -115,14 +121,14 @@ func TestOnlyUsesRightHalfTraceID(t *testing.T) {
 }
 
 func TestZeroSizeReturnsError(t *testing.T) {
-	tb, _ := metadata.NewTelemetryBuilder(componenttest.NewNopTelemetrySettings())
-	c, err := NewLRUCache[bool](0, func(uint64, bool) {}, tb)
+	c, err := NewLRUCache[bool](0, func(uint64, bool) {}, testTelem)
 	assert.Error(t, err)
 	assert.Nil(t, c)
 }
 
-func traceIDFromHex(idStr string) (pcommon.TraceID, error) {
+func traceIDFromHex(t testing.TB, idStr string) pcommon.TraceID {
 	id := pcommon.NewTraceIDEmpty()
 	_, err := hex.Decode(id[:], []byte(idStr))
-	return id, err
+	require.NoError(t, err)
+	return id
 }

@@ -25,3 +25,7 @@ func (n *nopDecisionCache[V]) Put(_ pcommon.TraceID, _ V) {
 }
 
 func (n *nopDecisionCache[V]) Delete(_ pcommon.TraceID) {}
+
+func (n *nopDecisionCache[V]) Values() []V {
+	return make([]V, 0)
+}

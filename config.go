@@ -14,6 +14,9 @@ type Config struct {
 	MaxTraces int `mapstructure:"max_traces"`
 
 	DecisionCacheCfg `mapstructure:"decision_cache"`
+
+	// FlushOnShutdown determines whether to flush the pending/cached trace data upon shutdown.
+	FlushOnShutdown bool `mapstructure:"flush_on_shutdown"`
 }
 
 var _ component.Config = (*Config)(nil)

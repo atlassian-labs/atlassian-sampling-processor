@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/collector/processor"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
+	"go.uber.org/multierr"
 	"go.uber.org/zap"
 
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/cache"
@@ -22,6 +23,8 @@ import (
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/metadata"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 )
+
+const flushCountKey = "atlassiansampling.flushes"
 
 type atlassianSamplingProcessor struct {
 	next      consumer.Traces
@@ -39,9 +42,12 @@ type atlassianSamplingProcessor struct {
 	nonSampledDecisionCache cache.Cache[time.Time]
 	// incomingTraces is where the traces are put when they first arrive to the component
 	incomingTraces chan ptrace.Traces
-	shutdownStart  chan struct{}
-	waitGroup      sync.WaitGroup
-	started        atomic.Bool
+	// shutdownStart is a chan used to signal to the async goroutine to start shutdown.
+	// The deadline time is passed to the chan, so the async goroutine knows when to time out.
+	shutdownStart   chan time.Time
+	waitGroup       sync.WaitGroup
+	flushOnShutdown bool
+	started         atomic.Bool
 }
 
 var _ processor.Traces = (*atlassianSamplingProcessor)(nil)
@@ -62,8 +68,9 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 		telemetry: telemetry,
 		log:       set.Logger,
 
-		incomingTraces: make(chan ptrace.Traces),
-		shutdownStart:  make(chan struct{}),
+		incomingTraces:  make(chan ptrace.Traces),
+		shutdownStart:   make(chan time.Time),
+		flushOnShutdown: cfg.FlushOnShutdown,
 	}
 
 	traceData, err := cache.NewLRUCache[*tracedata.TraceData](cfg.MaxTraces, asp.onEvictTrace, telemetry)
@@ -105,20 +112,32 @@ func (asp *atlassianSamplingProcessor) Start(_ context.Context, _ component.Host
 	return nil
 }
 
-func (asp *atlassianSamplingProcessor) Shutdown(_ context.Context) error {
+func (asp *atlassianSamplingProcessor) Shutdown(parentCtx context.Context) error {
 	if !asp.started.Load() {
 		return nil
 	}
 
+	deadline := time.Now().Add(50 * time.Second)
+	ctx, cancel := context.WithDeadline(parentCtx, deadline)
+	defer cancel()
+	// Need to close chan because if parentCtx is cancelled already, the below select/case never sends the shutdown
+	// signal, resulting in the consumeChan() goroutine to block waiting. Closing the channel forces this to release.
+	defer close(asp.shutdownStart)
+
 	select {
-	case asp.shutdownStart <- struct{}{}:
-	case <-time.After(time.Second * 10):
-		return fmt.Errorf("shutdown timed out waiting for consumer goroutine to acknowledge shutdown")
+	case asp.shutdownStart <- deadline:
+		asp.waitGroup.Wait()
+		asp.started.Store(false)
+	case <-ctx.Done():
+		return fmt.Errorf("failed to wait for consumer goroutine to acknowledge shutdown: %w", ctx.Err())
 	}
 
-	asp.waitGroup.Wait()
-	asp.started.Store(false)
-	return nil
+	var err error
+	if asp.flushOnShutdown {
+		err = asp.flushAll(ctx)
+	}
+
+	return err
 }
 
 // ConsumeTraces implements the processing interface.
@@ -152,8 +171,8 @@ func (asp *atlassianSamplingProcessor) consumeChan() {
 			}
 
 		// If shutdown is signaled, process any pending traces and return
-		case <-asp.shutdownStart:
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		case deadline := <-asp.shutdownStart:
+			shutdownCtx, cancel := context.WithDeadline(ctx, deadline)
 			for {
 				select {
 				case nt := <-asp.incomingTraces:
@@ -163,7 +182,7 @@ func (asp *atlassianSamplingProcessor) consumeChan() {
 					}
 				case <-shutdownCtx.Done():
 					cancel()
-					asp.log.Warn("context cancelled due to timeout", zap.Error(shutdownCtx.Err()))
+					asp.log.Warn("context cancelled before we could process all incoming traces", zap.Error(shutdownCtx.Err()))
 					return
 				default:
 					cancel()
@@ -240,6 +259,34 @@ func (asp *atlassianSamplingProcessor) releaseSampledTrace(ctx context.Context, 
 			"Error sending spans to destination",
 			zap.Error(err))
 	}
+}
+
+func (asp *atlassianSamplingProcessor) flushAll(ctx context.Context) error {
+	var err error
+	vals := asp.traceData.Values()
+	for i, td := range vals {
+
+		// Increment flush count attribute
+		rs := td.ReceivedBatches.ResourceSpans()
+		for j := 0; j < rs.Len(); j++ {
+			var flushes int64 = 0
+			rsAttrs := rs.At(j).Resource().Attributes()
+			if v, ok := rsAttrs.Get(flushCountKey); ok {
+				flushes = v.Int()
+			}
+			flushes++
+			rsAttrs.PutInt(flushCountKey, flushes)
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf(""+
+				"flush could not complete due to context cancellation, "+
+				"only flushed %d out of %d traces: %w", i, len(vals), ctx.Err())
+		default:
+			err = multierr.Append(err, asp.next.ConsumeTraces(ctx, td.ReceivedBatches))
+		}
+	}
+	return err
 }
 
 func (asp *atlassianSamplingProcessor) onEvictTrace(id uint64, td *tracedata.TraceData) {
