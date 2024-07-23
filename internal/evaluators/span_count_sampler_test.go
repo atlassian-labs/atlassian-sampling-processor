@@ -8,16 +8,13 @@ package evaluators
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
-	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 
-	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/cache"
-	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/metadata"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 )
 
@@ -27,46 +24,43 @@ func TestEvaluate(t *testing.T) {
 	traceID := pcommon.TraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
 
 	cases := []struct {
-		Desc        string
-		NumberSpans int
-		Evaluator   PolicyEvaluator
-		Decision    Decision
+		Desc             string
+		NumberSpans      int
+		NumberCachedSpan int
+		Decision         Decision
 	}{
 		{
 			"Spans less than the minSpans, in one single batch",
 			1,
-			NewSpanCount(minSpans, cache.NewNopDecisionCache[*tracedata.TraceData]()),
+			0,
 			Pending,
 		},
 		{
 			"Same number of spans as the minSpans, in one single batch",
 			3,
-			NewSpanCount(minSpans, cache.NewNopDecisionCache[*tracedata.TraceData]()),
+			0,
 			Sampled,
 		},
 		{
 			"Combined with cached data satisfies min spans",
 			2,
-			func() PolicyEvaluator {
-				tel, _ := metadata.NewTelemetryBuilder(componenttest.NewNopTelemetrySettings())
-				c, _ := cache.NewLRUCache[*tracedata.TraceData](10, func(_ uint64, _ *tracedata.TraceData) {}, tel)
-				c.Put(traceID, newTraceWithMultipleSpans(2))
-				return NewSpanCount(minSpans, c)
-			}(),
+			1,
 			Sampled,
 		},
 	}
 
+	evaluator := NewSpanCount(minSpans)
+
 	for _, c := range cases {
 		t.Run(c.Desc, func(t *testing.T) {
-			decision, err := c.Evaluator.Evaluate(context.Background(), traceID, newTraceWithMultipleSpans(c.NumberSpans))
+			decision, err := evaluator.Evaluate(context.Background(), traceID, newTraceWithMultipleSpans(c.NumberSpans), newMergedMetadata(c.NumberSpans, c.NumberCachedSpan))
 			assert.NoError(t, err)
 			assert.Equal(t, decision, c.Decision)
 		})
 	}
 }
 
-func newTraceWithMultipleSpans(numberSpans int) *tracedata.TraceData {
+func newTraceWithMultipleSpans(numberSpans int) ptrace.Traces {
 	// For each resource, going to create the number of spans defined in the array
 	traces := ptrace.NewTraces()
 	for i := 0; i < numberSpans; i++ {
@@ -79,5 +73,13 @@ func newTraceWithMultipleSpans(numberSpans int) *tracedata.TraceData {
 		span.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
 	}
 
-	return tracedata.NewTraceData(time.Now(), traces)
+	return traces
+}
+
+func newMergedMetadata(numberSpans int, numberCachedSpans int) *tracedata.Metadata {
+	sc := &atomic.Int64{}
+	sc.Store(int64(numberSpans + numberCachedSpans))
+	return &tracedata.Metadata{
+		SpanCount: sc,
+	}
 }

@@ -10,6 +10,7 @@ import (
 	"context"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
+	"go.opentelemetry.io/collector/pdata/ptrace"
 
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 )
@@ -28,11 +29,11 @@ func NewAndEvaluator(
 }
 
 // Evaluate looks at the trace data and returns a corresponding SamplingDecision.
-func (c *andEvaluator) Evaluate(ctx context.Context, traceID pcommon.TraceID, trace *tracedata.TraceData) (Decision, error) {
+func (c *andEvaluator) Evaluate(ctx context.Context, traceID pcommon.TraceID, currentTrace ptrace.Traces, mergedMetadata *tracedata.Metadata) (Decision, error) {
 	// The policy iterates over all sub-policies and returns Sampled if all sub-policies returned a Sampled Decision.
 	// If any subPolicy returns NotSampled or InvertNotSampled it returns that
 	for _, sub := range c.subpolicies {
-		decision, err := sub.Evaluate(ctx, traceID, trace)
+		decision, err := sub.Evaluate(ctx, traceID, currentTrace, mergedMetadata)
 		if err != nil {
 			return Unspecified, err
 		}

@@ -14,8 +14,9 @@ func TestCreation(t *testing.T) {
 	trace.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
 	now := time.Now()
 	td := NewTraceData(now, trace)
-	assert.Equal(t, int64(1), td.SpanCount.Load())
-	assert.Equal(t, now, td.ArrivalTime)
+	m := td.Metadata
+	assert.Equal(t, int64(1), m.SpanCount.Load())
+	assert.Equal(t, now, m.ArrivalTime)
 }
 
 func TestMerge(t *testing.T) {
@@ -31,9 +32,10 @@ func TestMerge(t *testing.T) {
 	td1 := NewTraceData(time.Now(), trace1)
 	td2 := NewTraceData(time.Now(), trace2)
 	td1.MergeWith(td2)
+	m1 := td1.Metadata
 
-	assert.Equal(t, int64(2), td1.SpanCount.Load())
+	assert.Equal(t, int64(2), m1.SpanCount.Load())
 	assert.Equal(t, 2, td1.ReceivedBatches.ResourceSpans().Len())
-	assert.Equal(t, pcommon.Timestamp(1), td1.EarliestStartTime)
-	assert.Equal(t, pcommon.Timestamp(4), td1.LatestEndTime)
+	assert.Equal(t, pcommon.Timestamp(1), m1.EarliestStartTime)
+	assert.Equal(t, pcommon.Timestamp(4), m1.LatestEndTime)
 }

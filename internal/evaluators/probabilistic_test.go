@@ -78,8 +78,9 @@ func TestProbabilisticSampling(t *testing.T) {
 			sampled := 0
 			for _, traceID := range genRandomTraceIDs(traceCount) {
 				trace := newTraceStringAttrs(nil, "example", "value")
+				mergedMetadata := &tracedata.Metadata{}
 
-				decision, err := probabilisticSampler.Evaluate(context.Background(), traceID, trace)
+				decision, err := probabilisticSampler.Evaluate(context.Background(), traceID, trace, mergedMetadata)
 				assert.NoError(t, err)
 
 				if decision == Sampled {
@@ -107,7 +108,7 @@ func genRandomTraceIDs(num int) (ids []pcommon.TraceID) {
 	return ids
 }
 
-func newTraceStringAttrs(nodeAttrs map[string]any, spanAttrKey string, spanAttrValue string) *tracedata.TraceData {
+func newTraceStringAttrs(nodeAttrs map[string]any, spanAttrKey string, spanAttrValue string) ptrace.Traces {
 	traces := ptrace.NewTraces()
 	rs := traces.ResourceSpans().AppendEmpty()
 	//nolint:errcheck
@@ -117,7 +118,5 @@ func newTraceStringAttrs(nodeAttrs map[string]any, spanAttrKey string, spanAttrV
 	span.SetTraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
 	span.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
 	span.Attributes().PutStr(spanAttrKey, spanAttrValue)
-	return &tracedata.TraceData{
-		ReceivedBatches: traces,
-	}
+	return traces
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/pdata/pcommon"
+	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
 
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/evaluators"
@@ -82,11 +83,12 @@ func TestMakeDecision(t *testing.T) {
 	}
 
 	telemetry, _ := metadata.NewTelemetryBuilder(componenttest.NewNopTelemetrySettings())
-	var traceData *tracedata.TraceData
+	var traceData ptrace.Traces
+	var mergedMetadata *tracedata.Metadata
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			dec := newDecider(test.policies, zap.NewNop(), telemetry)
-			decision := dec.MakeDecision(context.Background(), testTraceID, traceData)
+			decision := dec.MakeDecision(context.Background(), testTraceID, traceData, mergedMetadata)
 			assert.Equal(t, test.expectDecision, decision)
 		})
 	}
@@ -122,12 +124,12 @@ func alwaysError() *policy {
 
 type errorPolicy struct{}
 
-func (ep *errorPolicy) Evaluate(_ context.Context, _ pcommon.TraceID, _ *tracedata.TraceData) (evaluators.Decision, error) {
+func (ep *errorPolicy) Evaluate(_ context.Context, _ pcommon.TraceID, _ ptrace.Traces, _ *tracedata.Metadata) (evaluators.Decision, error) {
 	return evaluators.Unspecified, fmt.Errorf("test error")
 }
 
 type hardNotSampledPolicy struct{}
 
-func (p *hardNotSampledPolicy) Evaluate(_ context.Context, _ pcommon.TraceID, _ *tracedata.TraceData) (evaluators.Decision, error) {
+func (p *hardNotSampledPolicy) Evaluate(_ context.Context, _ pcommon.TraceID, _ ptrace.Traces, _ *tracedata.Metadata) (evaluators.Decision, error) {
 	return evaluators.NotSampled, nil
 }

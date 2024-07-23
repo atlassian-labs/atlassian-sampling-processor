@@ -6,9 +6,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
-	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/cache"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/evaluators"
-	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 )
 
 // policy wraps a PolicyEvaluator including name provided by user and any measurements options
@@ -21,7 +19,7 @@ type policy struct {
 	attribute metric.MeasurementOption
 }
 
-func newPolicies(cfg []PolicyConfig, tCache cache.Cache[*tracedata.TraceData]) ([]*policy, error) {
+func newPolicies(cfg []PolicyConfig) ([]*policy, error) {
 	policyNames := map[string]bool{}
 	pols := make([]*policy, len(cfg))
 	for i := range cfg {
@@ -32,7 +30,7 @@ func newPolicies(cfg []PolicyConfig, tCache cache.Cache[*tracedata.TraceData]) (
 		}
 		policyNames[policyCfg.Name] = true
 
-		eval, err := getPolicyEvaluator(policyCfg, tCache)
+		eval, err := getPolicyEvaluator(policyCfg)
 		if err != nil {
 			return nil, err
 		}

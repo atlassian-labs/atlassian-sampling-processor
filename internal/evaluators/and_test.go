@@ -35,10 +35,9 @@ func TestAndEvaluatorNotSampled(t *testing.T) {
 	span.SetTraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
 	span.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
 
-	trace := &tracedata.TraceData{
-		ReceivedBatches: traces,
-	}
-	decision, err := and.Evaluate(context.Background(), traceID, trace)
+	mergedMetadata := &tracedata.Metadata{}
+
+	decision, err := and.Evaluate(context.Background(), traceID, traces, mergedMetadata)
 	require.NoError(t, err, "Failed to evaluate and policy: %w", err)
 	assert.Equal(t, decision, Pending)
 
@@ -60,10 +59,9 @@ func TestAndEvaluatorSampled(t *testing.T) {
 	span.SetTraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
 	span.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
 
-	trace := &tracedata.TraceData{
-		ReceivedBatches: traces,
-	}
-	decision, err := and.Evaluate(context.Background(), traceID, trace)
+	mergedMetadata := &tracedata.Metadata{}
+
+	decision, err := and.Evaluate(context.Background(), traceID, traces, mergedMetadata)
 	require.NoError(t, err, "Failed to evaluate and policy: %w", err)
 	assert.Equal(t, decision, Sampled)
 }

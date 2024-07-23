@@ -8,41 +8,32 @@ import (
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 
-	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/cache"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 )
 
 var emptySpanID = pcommon.NewSpanIDEmpty()
 
-type rootSpansEvaluator[T any] struct {
-	subPolicy  PolicyEvaluator
-	cachedData cache.Cache[T]
+type rootSpansEvaluator struct {
+	subPolicy PolicyEvaluator
 }
 
-var _ PolicyEvaluator = (*rootSpansEvaluator[any])(nil)
+var _ PolicyEvaluator = (*rootSpansEvaluator)(nil)
 
-func NewRootSpan[T any](
-	subPolicy PolicyEvaluator,
-	cachedData cache.Cache[T],
-) PolicyEvaluator {
-	return &rootSpansEvaluator[T]{
-		subPolicy:  subPolicy,
-		cachedData: cachedData,
+func NewRootSpan(subPolicy PolicyEvaluator) PolicyEvaluator {
+	return &rootSpansEvaluator{
+		subPolicy: subPolicy,
 	}
 }
 
 // Evaluate evaluates if a span is a root span without children.
 // If it has no children, it evaluates the sub policy turning Pending decisions into NotSampled.
-func (r *rootSpansEvaluator[T]) Evaluate(ctx context.Context, traceID pcommon.TraceID, trace *tracedata.TraceData) (Decision, error) {
-	if trace.SpanCount.Load() != 1 {
-		return Pending, nil
-	}
-	if _, ok := r.cachedData.Get(traceID); ok {
+func (r *rootSpansEvaluator) Evaluate(ctx context.Context, traceID pcommon.TraceID, currentTrace ptrace.Traces, mergedMetadata *tracedata.Metadata) (Decision, error) {
+	if mergedMetadata.SpanCount.Load() != 1 {
 		return Pending, nil
 	}
 
 	// we know there's only one span so check that span if it's a root span
-	onlySpan := findOnlySpan(trace.ReceivedBatches)
+	onlySpan := findOnlySpan(currentTrace)
 	if onlySpan == nil {
 		return Unspecified, fmt.Errorf("span count was 1 but no span in trace data, tracedata invalid/corrupt")
 	}
@@ -50,7 +41,7 @@ func (r *rootSpansEvaluator[T]) Evaluate(ctx context.Context, traceID pcommon.Tr
 		return Pending, nil
 	}
 
-	subDecision, err := r.subPolicy.Evaluate(ctx, traceID, trace)
+	subDecision, err := r.subPolicy.Evaluate(ctx, traceID, currentTrace, mergedMetadata)
 	if err != nil {
 		return Unspecified, err
 	}

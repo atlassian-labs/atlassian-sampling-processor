@@ -10,6 +10,7 @@ import (
 	"context"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
+	"go.opentelemetry.io/collector/pdata/ptrace"
 
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 )
@@ -45,6 +46,8 @@ func (d *Decision) String() string {
 // PolicyEvaluator implements a tail-based sampling policy evaluator,
 // which makes a sampling decision for a given trace when requested.
 type PolicyEvaluator interface {
-	// Evaluate looks at the trace data and returns a corresponding SamplingDecision.
-	Evaluate(ctx context.Context, traceID pcommon.TraceID, trace *tracedata.TraceData) (Decision, error)
+	// Evaluate looks at the trace data and merged metadata, and returns a corresponding SamplingDecision.
+	// The cached trace data is not passed on to avoid evaluators going through the old spans.
+	// The metadata should contain all relevant information about the old spans needed to make a decision.
+	Evaluate(ctx context.Context, traceID pcommon.TraceID, currentTrace ptrace.Traces, mergedMetadata *tracedata.Metadata) (Decision, error)
 }

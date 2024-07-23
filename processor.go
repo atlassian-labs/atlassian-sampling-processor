@@ -90,7 +90,7 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 	asp.sampledDecisionCache = sdc
 	asp.nonSampledDecisionCache = nsdc
 
-	pols, err := newPolicies(cfg.PolicyConfig, traceData)
+	pols, err := newPolicies(cfg.PolicyConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -200,12 +200,19 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 			continue
 		}
 
-		pData := ptrace.NewTraces()
-		appendToTraces(pData, resourceSpans, spans)
-		td := tracedata.NewTraceData(time.Now(), pData)
+		currentTrace := ptrace.NewTraces()
+		appendToTraces(currentTrace, resourceSpans, spans)
+		td := tracedata.NewTraceData(time.Now(), currentTrace)
+
+		// Merge metadata with any metadata in the cache to pass to evaluators
+		mergedMetadata := td.Metadata.DeepCopy()
+
+		if cachedData, ok := asp.traceData.Get(id); ok {
+			mergedMetadata.MergeWith(cachedData.Metadata)
+		}
 
 		// Evaluate the spans against the policies.
-		finalDecision := asp.decider.MakeDecision(ctx, id, td)
+		finalDecision := asp.decider.MakeDecision(ctx, id, currentTrace, mergedMetadata)
 
 		switch finalDecision {
 		case evaluators.Sampled:
@@ -293,7 +300,7 @@ func (asp *atlassianSamplingProcessor) onEvictTrace(id uint64, td *tracedata.Tra
 	ctx := context.Background()
 	asp.log.Debug("evicting trace from cache", zap.Uint64("traceID", id))
 	asp.telemetry.ProcessorAtlassianSamplingTraceEvictionTime.
-		Record(ctx, time.Since(td.ArrivalTime).Seconds())
+		Record(ctx, time.Since(td.Metadata.ArrivalTime).Seconds())
 	// Convert back to [16]byte to query. We only need the right 8-bytes from the uint64,
 	// since the cache only uses the right 8 bytes.
 	idArr := pcommon.NewTraceIDEmpty()

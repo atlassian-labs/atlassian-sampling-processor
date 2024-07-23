@@ -85,6 +85,63 @@ func TestConsumeTraces_CachedDataIsSent(t *testing.T) {
 	assert.Equal(t, 2, sink.SpanCount())
 }
 
+func TestConsumeTraces_CacheMetadata(t *testing.T) {
+	ctx := context.Background()
+	f := NewFactory()
+	cfg := (f.CreateDefaultConfig()).(*Config)
+	cfg.PolicyConfig = []PolicyConfig{
+		{
+			SharedPolicyConfig: SharedPolicyConfig{
+				Name:                "test",
+				Type:                "probabilistic",
+				ProbabilisticConfig: ProbabilisticConfig{SamplingPercentage: 0}}, // never sample
+		},
+	}
+
+	sink := &consumertest.TracesSink{}
+
+	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
+	require.NoError(t, err)
+	require.NotNil(t, asp)
+
+	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
+
+	// Consume first trace
+	trace1 := ptrace.NewTraces()
+	span1 := trace1.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span1.SetTraceID(testTraceID)
+	span1.SetStartTimestamp(2)
+	span1.SetEndTimestamp(5)
+
+	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+
+	// Consume second trace
+	trace2 := ptrace.NewTraces()
+	spans := trace2.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans()
+
+	span2 := spans.AppendEmpty()
+	span2.SetTraceID(testTraceID)
+	span2.SetStartTimestamp(1)
+	span2.SetEndTimestamp(3)
+
+	span3 := spans.AppendEmpty()
+	span3.SetTraceID(testTraceID)
+	span3.SetStartTimestamp(4)
+	span3.SetEndTimestamp(8)
+
+	require.NoError(t, asp.ConsumeTraces(ctx, trace2))
+	require.NoError(t, asp.Shutdown(ctx))
+
+	// Cached metadata should represent all spans since they have the same trace id
+	cachedData, ok := asp.traceData.Get(testTraceID)
+	require.Equal(t, true, ok)
+
+	cachedMetadata := cachedData.Metadata
+	assert.Equal(t, int64(3), cachedMetadata.SpanCount.Load())
+	assert.Equal(t, pcommon.Timestamp(1), cachedMetadata.EarliestStartTime)
+	assert.Equal(t, pcommon.Timestamp(8), cachedMetadata.LatestEndTime)
+}
+
 func TestShutdown_Flushes(t *testing.T) {
 	ctx := context.Background()
 	f := NewFactory()

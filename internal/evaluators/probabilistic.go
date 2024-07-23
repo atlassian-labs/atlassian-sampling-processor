@@ -12,6 +12,7 @@ import (
 	"math/big"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
+	"go.opentelemetry.io/collector/pdata/ptrace"
 
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 )
@@ -41,7 +42,7 @@ func NewProbabilisticSampler(hashSalt string, samplingPercentage float64) Policy
 }
 
 // Evaluate looks at the trace data and returns a corresponding SamplingDecision.
-func (s *probabilisticSampler) Evaluate(_ context.Context, traceID pcommon.TraceID, _ *tracedata.TraceData) (Decision, error) {
+func (s *probabilisticSampler) Evaluate(_ context.Context, traceID pcommon.TraceID, _ ptrace.Traces, _ *tracedata.Metadata) (Decision, error) {
 	if hashTraceID(s.hashSalt, traceID[:]) <= s.threshold {
 		return Sampled, nil
 	}
