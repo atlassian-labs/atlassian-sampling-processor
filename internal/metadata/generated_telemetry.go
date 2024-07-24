@@ -52,7 +52,7 @@ func NewTelemetryBuilder(settings component.TelemetrySettings, options ...teleme
 		op(&builder)
 	}
 	var err, errs error
-	if builder.level >= configtelemetry.LevelNormal {
+	if builder.level >= configtelemetry.LevelBasic {
 		builder.meter = Meter(settings)
 	} else {
 		builder.meter = noop.Meter{}

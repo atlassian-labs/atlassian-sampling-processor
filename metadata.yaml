@@ -10,7 +10,7 @@ status:
 tests:
 
 telemetry:
-  level: normal
+  level: basic
   metrics:
     processor_atlassian_sampling_traces_sampled:
       enabled: true
