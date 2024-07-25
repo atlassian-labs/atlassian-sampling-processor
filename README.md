@@ -65,10 +65,13 @@ Current supported policy types are:
 - `span_count` - samples the trace if it meets a minimum amount of spans. 
 - `probabilistic` - evaluates the hash of the trace ID to a configured percentage. 
 - `and` - combines any number of sampling policies together.
-- `root_spans` - Specifies a sub-policy to only operate on lone-root-spans, but eagerly converts the sub-policy "pending"
+- `root_spans` - specifies a sub-policy to only operate on lone-root-spans, but eagerly converts the sub-policy "pending"
   decisions into "not sampled" decisions. A span considered to be "lone" if there is no other spans present for the same
   trace when it arrives, and it is considered to be a root span if it has no parent ID, or has a parent ID equal to the 
   right 64-bits of the trace ID.
+- `latency` - samples traces with duration equal to or greater than threshold_ms. The duration is determined by looking at the earliest start time and latest end time, without taking into consideration what happened in between.
+- `status_code` - samples based upon the status code (OK, ERROR or UNSET)
+- `ottl_condition` - samples based on given boolean OTTL condition (span and span event).
 
 ### Example
 

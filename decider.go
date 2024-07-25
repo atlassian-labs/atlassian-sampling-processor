@@ -78,6 +78,15 @@ func getSharedPolicyEvaluator(cfg *SharedPolicyConfig) (evaluators.PolicyEvaluat
 	case SpanCount:
 		spCfg := cfg.SpanCountConfig
 		return evaluators.NewSpanCount(spCfg.MinSpans), nil
+	case Latency:
+		lCfg := cfg.LatencyConfig
+		return evaluators.NewLatency(lCfg.ThresholdMs), nil
+	case StatusCode:
+		sceCfg := cfg.StatusCodeConfig
+		return evaluators.NewStatusCodeEvaluator(sceCfg.StatusCodes)
+	case OTTLCondition:
+		ottlcCfg := cfg.OTTLConditionConfig
+		return evaluators.NewOTTLConditionEvaluator(ottlcCfg.SpanConditions, ottlcCfg.SpanEventConditions, ottlcCfg.ErrorMode)
 
 	default:
 		return nil, fmt.Errorf("unknown sampling policy type %s", cfg.Type)

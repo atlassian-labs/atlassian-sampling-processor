@@ -6,6 +6,8 @@
 
 package atlassiansamplingprocessor // import "bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor"
 
+import "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl"
+
 // PolicyConfig holds the common configuration to all policies.
 type PolicyConfig struct {
 	SharedPolicyConfig `mapstructure:",squash"` // squash ensures fields are correctly decoded in embedded struct
@@ -27,6 +29,12 @@ type SharedPolicyConfig struct {
 	ProbabilisticConfig `mapstructure:"probabilistic"`
 	// Configs for span count filter sampling policy evaluator.
 	SpanCountConfig `mapstructure:"span_count"`
+	// Configs for latency filter sampling policy evaluator.
+	LatencyConfig `mapstructure:"latency"`
+	// Configs for status code filter sampling policy evaluator.
+	StatusCodeConfig `mapstructure:"status_code"`
+	// Configs for OTTL condition filter sampling policy evaluator
+	OTTLConditionConfig `mapstructure:"ottl_condition"`
 }
 
 // AndSubPolicyConfig holds the common configuration to all policies under and policy.
@@ -62,6 +70,27 @@ type RootSpansConfig struct {
 	SubPolicyCfg SharedPolicyConfig `mapstructure:"sub_policy"`
 }
 
+// LatencyConfig holds the configurable settings to create a latency filter sampling policy
+// evaluator
+type LatencyConfig struct {
+	// Lower bound in milliseconds
+	ThresholdMs int64 `mapstructure:"threshold_ms"`
+}
+
+// StatusCodeConfig holds the configurable settings to create a status code filter sampling
+// policy evaluator.
+type StatusCodeConfig struct {
+	StatusCodes []string `mapstructure:"status_codes"`
+}
+
+// OTTLConditionConfig holds the configurable setting to create a OTTL condition filter
+// sampling policy evaluator.
+type OTTLConditionConfig struct {
+	ErrorMode           ottl.ErrorMode `mapstructure:"error_mode"`
+	SpanConditions      []string       `mapstructure:"span"`
+	SpanEventConditions []string       `mapstructure:"spanevent"`
+}
+
 // PolicyType indicates the type of sampling policy.
 type PolicyType string
 
@@ -74,4 +103,11 @@ const (
 	SpanCount PolicyType = "span_count"
 	// RootSpans allows a sub-policy to be defined, and operates the sub-policy only on root spans with no children.
 	RootSpans PolicyType = "root_spans"
+	// Latency sample traces that are longer than a given threshold.
+	Latency PolicyType = "latency"
+	// StatusCode sample traces that have a given status code.
+	StatusCode PolicyType = "status_code"
+	// OTTLCondition sample traces which match user provided OpenTelemetry Transformation Language
+	// conditions.
+	OTTLCondition PolicyType = "ottl_condition"
 )

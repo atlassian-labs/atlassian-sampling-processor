@@ -16,6 +16,8 @@ import (
 	"go.opentelemetry.io/collector/confmap/confmaptest"
 
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/metadata"
+
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl"
 )
 
 func TestLoadConfig(t *testing.T) {
@@ -95,6 +97,35 @@ func TestLoadConfig(t *testing.T) {
 							ProbabilisticConfig: ProbabilisticConfig{
 								SamplingPercentage: 0,
 							},
+						},
+					},
+				},
+				{
+					SharedPolicyConfig: SharedPolicyConfig{
+						Name: "test-policy-5",
+						Type: "latency",
+						LatencyConfig: LatencyConfig{
+							ThresholdMs: 5000,
+						},
+					},
+				},
+				{
+					SharedPolicyConfig: SharedPolicyConfig{
+						Name: "test-policy-6",
+						Type: "status_code",
+						StatusCodeConfig: StatusCodeConfig{
+							StatusCodes: []string{"ERROR", "UNSET"},
+						},
+					},
+				},
+				{
+					SharedPolicyConfig: SharedPolicyConfig{
+						Name: "test-policy-7",
+						Type: OTTLCondition,
+						OTTLConditionConfig: OTTLConditionConfig{
+							ErrorMode:           ottl.IgnoreError,
+							SpanConditions:      []string{"attributes[\"test_attr_key_1\"] == \"test_attr_val_1\"", "attributes[\"test_attr_key_2\"] != \"test_attr_val_1\""},
+							SpanEventConditions: []string{"name != \"test_span_event_name\"", "attributes[\"test_event_attr_key_2\"] != \"test_event_attr_val_1\""},
 						},
 					},
 				},
