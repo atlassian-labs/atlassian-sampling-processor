@@ -312,7 +312,7 @@ func (asp *atlassianSamplingProcessor) onEvictTrace(id uint64, td *tracedata.Tra
 		asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
 		asp.telemetry.ProcessorAtlassianSamplingPolicyDecisions.Add(ctx, 1, metric.WithAttributes(
 			attribute.String("policy", "evicted"),
-			attribute.String("decision", string(evaluators.NotSampled)),
+			attribute.String("decision", evaluators.NotSampled.String()),
 		))
 	}
 }

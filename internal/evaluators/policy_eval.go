@@ -29,8 +29,8 @@ const (
 	NotSampled
 )
 
-func (d *Decision) String() string {
-	switch *d {
+func (d Decision) String() string {
+	switch d {
 	case Unspecified:
 		return "Unspecified"
 	case Pending:
