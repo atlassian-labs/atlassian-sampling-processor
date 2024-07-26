@@ -37,16 +37,14 @@ telemetry:
       enabled: true
       description: Time that a non-sampled trace was kept in memory from arrival to being evicted
       unit: s
-      histogram:
+      gauge:
         value_type: double
-        bucket_boundaries: [1, 5, 10, 30, 60, 120, 240, 360, 720]
     processor_atlassian_sampling_decision_eviction_time:
       enabled: true
       description: Time that a trace ID spent in the decision cache before it was evicted
       unit: s
-      histogram:
+      gauge:
         value_type: double
-        bucket_boundaries: [30, 60, 120, 240, 360, 720, 1080, 1800, 3600]
     processor_atlassian_sampling_cache_reads:
       enabled: true
       description: Amount of times a cache was read from

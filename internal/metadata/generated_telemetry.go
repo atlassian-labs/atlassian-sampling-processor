@@ -26,9 +26,9 @@ type TelemetryBuilder struct {
 	meter                                          metric.Meter
 	ProcessorAtlassianSamplingCacheReads           metric.Int64Counter
 	ProcessorAtlassianSamplingChanBlockingTime     metric.Int64Histogram
-	ProcessorAtlassianSamplingDecisionEvictionTime metric.Float64Histogram
+	ProcessorAtlassianSamplingDecisionEvictionTime metric.Float64Gauge
 	ProcessorAtlassianSamplingPolicyDecisions      metric.Int64Counter
-	ProcessorAtlassianSamplingTraceEvictionTime    metric.Float64Histogram
+	ProcessorAtlassianSamplingTraceEvictionTime    metric.Float64Gauge
 	ProcessorAtlassianSamplingTracesNotSampled     metric.Int64Counter
 	ProcessorAtlassianSamplingTracesSampled        metric.Int64Counter
 	level                                          configtelemetry.Level
@@ -69,10 +69,10 @@ func NewTelemetryBuilder(settings component.TelemetrySettings, options ...teleme
 		metric.WithUnit("ns"), metric.WithExplicitBucketBoundaries([]float64{5000, 10000, 50000, 100000, 500000, 1e+06, 5e+06, 1e+07}...),
 	)
 	errs = errors.Join(errs, err)
-	builder.ProcessorAtlassianSamplingDecisionEvictionTime, err = builder.meter.Float64Histogram(
+	builder.ProcessorAtlassianSamplingDecisionEvictionTime, err = builder.meter.Float64Gauge(
 		"processor_atlassian_sampling_decision_eviction_time",
 		metric.WithDescription("Time that a trace ID spent in the decision cache before it was evicted"),
-		metric.WithUnit("s"), metric.WithExplicitBucketBoundaries([]float64{30, 60, 120, 240, 360, 720, 1080, 1800, 3600}...),
+		metric.WithUnit("s"),
 	)
 	errs = errors.Join(errs, err)
 	builder.ProcessorAtlassianSamplingPolicyDecisions, err = builder.meter.Int64Counter(
@@ -81,10 +81,10 @@ func NewTelemetryBuilder(settings component.TelemetrySettings, options ...teleme
 		metric.WithUnit("{decisions}"),
 	)
 	errs = errors.Join(errs, err)
-	builder.ProcessorAtlassianSamplingTraceEvictionTime, err = builder.meter.Float64Histogram(
+	builder.ProcessorAtlassianSamplingTraceEvictionTime, err = builder.meter.Float64Gauge(
 		"processor_atlassian_sampling_trace_eviction_time",
 		metric.WithDescription("Time that a non-sampled trace was kept in memory from arrival to being evicted"),
-		metric.WithUnit("s"), metric.WithExplicitBucketBoundaries([]float64{1, 5, 10, 30, 60, 120, 240, 360, 720}...),
+		metric.WithUnit("s"),
 	)
 	errs = errors.Join(errs, err)
 	builder.ProcessorAtlassianSamplingTracesNotSampled, err = builder.meter.Int64Counter(

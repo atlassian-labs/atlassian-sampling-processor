@@ -28,7 +28,7 @@ Time that a trace ID spent in the decision cache before it was evicted
 
 | Unit | Metric Type | Value Type |
 | ---- | ----------- | ---------- |
-| s | Histogram | Double |
+| s | Gauge | Double |
 
 ### processor_atlassian_sampling_policy_decisions
 
@@ -44,7 +44,7 @@ Time that a non-sampled trace was kept in memory from arrival to being evicted
 
 | Unit | Metric Type | Value Type |
 | ---- | ----------- | ---------- |
-| s | Histogram | Double |
+| s | Gauge | Double |
 
 ### processor_atlassian_sampling_traces_not_sampled
 

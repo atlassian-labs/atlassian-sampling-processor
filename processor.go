@@ -310,6 +310,10 @@ func (asp *atlassianSamplingProcessor) onEvictTrace(id uint64, td *tracedata.Tra
 		// Mark as not sampled
 		asp.nonSampledDecisionCache.Put(idArr, time.Now())
 		asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
+		asp.telemetry.ProcessorAtlassianSamplingPolicyDecisions.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("policy", "evicted"),
+			attribute.String("decision", string(evaluators.NotSampled)),
+		))
 	}
 }
 
