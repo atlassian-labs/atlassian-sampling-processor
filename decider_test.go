@@ -18,67 +18,97 @@ import (
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 )
 
-func TestMakeDecision(t *testing.T) {
+type testPols struct {
+	Policies map[string]*policy
+}
 
+func setupTestPolicies() testPols {
+	return testPols{Policies: map[string]*policy{
+		"alwaysPending":  alwaysPending(),
+		"alwaysSample":   alwaysSample(),
+		"hardNotSampled": hardNotSampled(),
+		"alwaysError":    alwaysError(),
+	}}
+}
+
+func TestMakeDecision(t *testing.T) {
+	testPols := setupTestPolicies()
 	tests := []struct {
 		name           string
 		policies       []*policy
 		expectDecision evaluators.Decision
+		expectPolicy   *policy
 	}{
 		{
 			name: "One pending, one sampled results in overall sampled",
 			policies: []*policy{
-				alwaysPending(),
-				alwaysSample(),
+				testPols.Policies["alwaysPending"],
+				testPols.Policies["alwaysSample"],
 			},
 			expectDecision: evaluators.Sampled,
+			expectPolicy:   testPols.Policies["alwaysSample"],
 		},
 		{
 			name: "All pending results in NotSampled",
 			policies: []*policy{
-				alwaysPending(),
-				alwaysPending(),
+				testPols.Policies["alwaysPending"],
+				testPols.Policies["alwaysPending"],
 			},
 			expectDecision: evaluators.Pending,
+			expectPolicy:   nil,
 		},
 		{
 			name: "Pending and NotSampled returns NotSampled",
 			policies: []*policy{
-				alwaysPending(),
-				hardNotSampled(),
+				testPols.Policies["alwaysPending"],
+				testPols.Policies["hardNotSampled"],
 			},
 			expectDecision: evaluators.NotSampled,
+			expectPolicy:   testPols.Policies["hardNotSampled"],
 		},
 		{
 			name: "Order matters, sampled first",
 			policies: []*policy{
-				alwaysSample(),
-				hardNotSampled(),
+				testPols.Policies["alwaysSample"],
+				testPols.Policies["hardNotSampled"],
 			},
 			expectDecision: evaluators.Sampled,
+			expectPolicy:   testPols.Policies["alwaysSample"],
 		},
 		{
 			name: "Order matters, NotSampled first",
 			policies: []*policy{
-				hardNotSampled(),
-				alwaysSample(),
+				testPols.Policies["hardNotSampled"],
+				testPols.Policies["alwaysSample"],
 			},
 			expectDecision: evaluators.NotSampled,
+			expectPolicy:   testPols.Policies["hardNotSampled"],
 		},
 		{
 			name: "On all errors, returns pending",
 			policies: []*policy{
-				alwaysError(),
+				testPols.Policies["alwaysError"],
 			},
 			expectDecision: evaluators.Pending,
+			expectPolicy:   nil,
 		},
 		{
 			name: "On some errors, returns non-error result",
 			policies: []*policy{
-				alwaysError(),
-				alwaysSample(),
+				testPols.Policies["alwaysError"],
+				testPols.Policies["alwaysSample"],
 			},
 			expectDecision: evaluators.Sampled,
+			expectPolicy:   testPols.Policies["alwaysSample"],
+		},
+		{
+			name: "Decider returns the right policy when decision is not sampled",
+			policies: []*policy{
+				testPols.Policies["hardNotSampled"],
+				testPols.Policies["alwaysSample"],
+			},
+			expectDecision: evaluators.NotSampled,
+			expectPolicy:   testPols.Policies["hardNotSampled"],
 		},
 	}
 
@@ -88,8 +118,9 @@ func TestMakeDecision(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			dec := newDecider(test.policies, zap.NewNop(), telemetry)
-			decision := dec.MakeDecision(context.Background(), testTraceID, traceData, mergedMetadata)
+			decision, policy := dec.MakeDecision(context.Background(), testTraceID, traceData, mergedMetadata)
 			assert.Equal(t, test.expectDecision, decision)
+			assert.Equal(t, test.expectPolicy, policy)
 		})
 	}
 }

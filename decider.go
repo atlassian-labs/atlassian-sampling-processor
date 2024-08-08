@@ -16,7 +16,7 @@ import (
 )
 
 type deciderI interface {
-	MakeDecision(ctx context.Context, id pcommon.TraceID, currentTrace ptrace.Traces, mergedMetadata *tracedata.Metadata) evaluators.Decision
+	MakeDecision(ctx context.Context, id pcommon.TraceID, currentTrace ptrace.Traces, mergedMetadata *tracedata.Metadata) (evaluators.Decision, *policy)
 }
 
 type decider struct {
@@ -37,7 +37,7 @@ func newDecider(pols []*policy, log *zap.Logger, telemetry *metadata.TelemetryBu
 
 // MakeDecision evaluates all policies, returning the first decision that isn't Pending.
 // If all decisions are non-decisive, it returns Pending.
-func (d *decider) MakeDecision(ctx context.Context, id pcommon.TraceID, currentTrace ptrace.Traces, mergedMetadata *tracedata.Metadata) evaluators.Decision {
+func (d *decider) MakeDecision(ctx context.Context, id pcommon.TraceID, currentTrace ptrace.Traces, mergedMetadata *tracedata.Metadata) (evaluators.Decision, *policy) {
 	for _, p := range d.policies {
 		decision, err := p.evaluator.Evaluate(ctx, id, currentTrace, mergedMetadata)
 		if err != nil {
@@ -48,10 +48,10 @@ func (d *decider) MakeDecision(ctx context.Context, id pcommon.TraceID, currentT
 			attribute.String("decision", decision.String()),
 		))
 		if decision == evaluators.Sampled || decision == evaluators.NotSampled {
-			return decision
+			return decision, p
 		}
 	}
-	return evaluators.Pending
+	return evaluators.Pending, nil
 }
 
 func getPolicyEvaluator(cfg *PolicyConfig) (evaluators.PolicyEvaluator, error) {

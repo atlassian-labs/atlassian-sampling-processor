@@ -214,3 +214,60 @@ func TestShutdown_TimesOut(t *testing.T) {
 	cancel() // Immediately cancel, simulating timeout
 	require.Error(t, asp.Shutdown(cancelledCtx))
 }
+
+func TestLonelyRootSpanPolicy_LateSpanIsHandled(t *testing.T) {
+	ctx := context.Background()
+	f := NewFactory()
+	cfg := (f.CreateDefaultConfig()).(*Config)
+	cfg.MaxTraces = 10
+	cfg.DecisionCacheCfg.SampledCacheSize = 10
+	cfg.DecisionCacheCfg.NonSampledCacheSize = 10
+	cfg.PolicyConfig = []PolicyConfig{
+		{
+			SharedPolicyConfig: SharedPolicyConfig{
+				Name: "test_drop_lonely_root_span_policy",
+				Type: "root_spans",
+			},
+			RootSpansConfig: RootSpansConfig{SharedPolicyConfig{
+				Name:                "aggressively_drop_lonely_root_spans",
+				Type:                Probabilistic,
+				ProbabilisticConfig: ProbabilisticConfig{SamplingPercentage: 0},
+			},
+			},
+		},
+	}
+
+	sink := &consumertest.TracesSink{}
+
+	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
+	require.NoError(t, err)
+	require.NotNil(t, asp)
+
+	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
+
+	trace1 := ptrace.NewTraces()
+	span := trace1.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span.SetTraceID(testTraceID)
+	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+
+	// We send a second span belonging to the same trace (late arriving span)
+	// Additionally, we need to block to allow the processor to finish processing our test trace to avoid a race
+	// This helps with that too
+
+	span2 := trace1.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span2.SetTraceID(testTraceID)
+	asp.incomingTraces <- ptrace.NewTraces()
+
+	// The late arriving span should not be sampled should not change the decision
+	assert.Equal(t, 0, sink.SpanCount())
+
+	// NSD cache should have the trace ID and related metadata (policy, decision time)
+	nsdValue, ok := asp.nonSampledDecisionCache.Get(testTraceID)
+	assert.True(t, ok)
+
+	assert.Equal(t, PolicyType("root_spans"), nsdValue.decisionPolicy.policyType)
+	assert.Equal(t, "test_drop_lonely_root_span_policy", nsdValue.decisionPolicy.name)
+
+	require.NoError(t, asp.Shutdown(ctx))
+
+}

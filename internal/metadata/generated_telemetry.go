@@ -23,15 +23,16 @@ func Tracer(settings component.TelemetrySettings) trace.Tracer {
 // TelemetryBuilder provides an interface for components to report telemetry
 // as defined in metadata and user config.
 type TelemetryBuilder struct {
-	meter                                          metric.Meter
-	ProcessorAtlassianSamplingCacheReads           metric.Int64Counter
-	ProcessorAtlassianSamplingChanBlockingTime     metric.Int64Histogram
-	ProcessorAtlassianSamplingDecisionEvictionTime metric.Float64Gauge
-	ProcessorAtlassianSamplingPolicyDecisions      metric.Int64Counter
-	ProcessorAtlassianSamplingTraceEvictionTime    metric.Float64Gauge
-	ProcessorAtlassianSamplingTracesNotSampled     metric.Int64Counter
-	ProcessorAtlassianSamplingTracesSampled        metric.Int64Counter
-	level                                          configtelemetry.Level
+	meter                                                        metric.Meter
+	ProcessorAtlassianSamplingCacheReads                         metric.Int64Counter
+	ProcessorAtlassianSamplingChanBlockingTime                   metric.Int64Histogram
+	ProcessorAtlassianSamplingDecisionEvictionTime               metric.Float64Gauge
+	ProcessorAtlassianSamplingOverlyEagerLonelyRootSpanDecisions metric.Int64Counter
+	ProcessorAtlassianSamplingPolicyDecisions                    metric.Int64Counter
+	ProcessorAtlassianSamplingTraceEvictionTime                  metric.Float64Gauge
+	ProcessorAtlassianSamplingTracesNotSampled                   metric.Int64Counter
+	ProcessorAtlassianSamplingTracesSampled                      metric.Int64Counter
+	level                                                        configtelemetry.Level
 }
 
 // telemetryBuilderOption applies changes to default builder.
@@ -73,6 +74,12 @@ func NewTelemetryBuilder(settings component.TelemetrySettings, options ...teleme
 		"processor_atlassian_sampling_decision_eviction_time",
 		metric.WithDescription("Time that a trace ID spent in the decision cache before it was evicted"),
 		metric.WithUnit("s"),
+	)
+	errs = errors.Join(errs, err)
+	builder.ProcessorAtlassianSamplingOverlyEagerLonelyRootSpanDecisions, err = builder.meter.Int64Counter(
+		"processor_atlassian_sampling_overly_eager_lonely_root_span_decisions",
+		metric.WithDescription("Number of traces that have been aggressively sampled out by root span policy"),
+		metric.WithUnit("{traces}"),
 	)
 	errs = errors.Join(errs, err)
 	builder.ProcessorAtlassianSamplingPolicyDecisions, err = builder.meter.Int64Counter(

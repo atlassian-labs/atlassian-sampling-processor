@@ -38,8 +38,9 @@ type atlassianSamplingProcessor struct {
 	traceData cache.Cache[*tracedata.TraceData]
 	// sampledDecisionCache holds the set of trace IDs that were sampled, and the time of decision
 	sampledDecisionCache cache.Cache[time.Time]
-	// sampledDecisionCache holds the set of trace IDs that were not sampled, and the time of decision
-	nonSampledDecisionCache cache.Cache[time.Time]
+	// nonSampledDecisionCache holds the set of trace IDs that were not sampled, and a struct that contains the policy that
+	// made the not sampled decision and the time the decision was made
+	nonSampledDecisionCache cache.Cache[*nsdOutcome]
 	// incomingTraces is where the traces are put when they first arrive to the component
 	incomingTraces chan ptrace.Traces
 	// shutdownStart is a chan used to signal to the async goroutine to start shutdown.
@@ -51,6 +52,11 @@ type atlassianSamplingProcessor struct {
 }
 
 var _ processor.Traces = (*atlassianSamplingProcessor)(nil)
+
+type nsdOutcome struct {
+	decisionTime   time.Time
+	decisionPolicy *policy
+}
 
 func newAtlassianSamplingProcessor(cCfg component.Config, set component.TelemetrySettings, next consumer.Traces) (*atlassianSamplingProcessor, error) {
 	cfg, ok := cCfg.(*Config)
@@ -81,7 +87,7 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 	if err != nil {
 		return nil, err
 	}
-	nsdc, err := cache.NewLRUCache[time.Time](cfg.NonSampledCacheSize, asp.onEvictNotSampled, telemetry)
+	nsdc, err := cache.NewLRUCache[*nsdOutcome](cfg.NonSampledCacheSize, asp.onEvictNotSampled, telemetry)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +218,7 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 		}
 
 		// Evaluate the spans against the policies.
-		finalDecision := asp.decider.MakeDecision(ctx, id, currentTrace, mergedMetadata)
+		finalDecision, pol := asp.decider.MakeDecision(ctx, id, currentTrace, mergedMetadata)
 
 		switch finalDecision {
 		case evaluators.Sampled:
@@ -227,7 +233,10 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 			return
 		case evaluators.NotSampled:
 			// Cache decision, delete any associated data
-			asp.nonSampledDecisionCache.Put(id, time.Now())
+			asp.nonSampledDecisionCache.Put(id, &nsdOutcome{
+				decisionTime:   time.Now(),
+				decisionPolicy: pol,
+			})
 			asp.traceData.Delete(id)
 			asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
 			return
@@ -254,7 +263,18 @@ func (asp *atlassianSamplingProcessor) cachedDecision(
 		asp.releaseSampledTrace(ctx, td)
 		return true
 	}
-	if _, ok := asp.nonSampledDecisionCache.Get(id); ok {
+	if c, ok := asp.nonSampledDecisionCache.Get(id); ok {
+		// If the traceId was not sampled because of lonely root span policy
+		// we've encountered an exception (we've received a late arriving non-root span)
+
+		if c.decisionPolicy != nil && c.decisionPolicy.policyType == "root_spans" {
+			asp.telemetry.ProcessorAtlassianSamplingOverlyEagerLonelyRootSpanDecisions.Add(ctx, 1, metric.WithAttributes(
+				attribute.String("policy", c.decisionPolicy.name)))
+			asp.log.Warn("Late non-root span received",
+				zap.String("traceId", id.String()),
+				zap.Duration("delta", time.Since(c.decisionTime)),
+			)
+		}
 		return true
 	}
 	return false
@@ -308,7 +328,10 @@ func (asp *atlassianSamplingProcessor) onEvictTrace(id uint64, td *tracedata.Tra
 	// Double check that we didn't actually sample this trace
 	if _, ok := asp.sampledDecisionCache.Get(idArr); !ok {
 		// Mark as not sampled
-		asp.nonSampledDecisionCache.Put(idArr, time.Now())
+		asp.nonSampledDecisionCache.Put(idArr, &nsdOutcome{
+			decisionTime:   time.Now(),
+			decisionPolicy: nil,
+		})
 		asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
 		asp.telemetry.ProcessorAtlassianSamplingPolicyDecisions.Add(ctx, 1, metric.WithAttributes(
 			attribute.String("policy", "evicted"),
@@ -324,9 +347,9 @@ func (asp *atlassianSamplingProcessor) onEvictSampled(id uint64, insertTime time
 			metric.WithAttributes(attribute.String("decision", "sampled")))
 }
 
-func (asp *atlassianSamplingProcessor) onEvictNotSampled(id uint64, insertTime time.Time) {
+func (asp *atlassianSamplingProcessor) onEvictNotSampled(id uint64, outcome *nsdOutcome) {
 	asp.log.Debug("evicting not-sampled decision", zap.Uint64("traceID", id))
 	asp.telemetry.ProcessorAtlassianSamplingDecisionEvictionTime.
-		Record(context.Background(), time.Since(insertTime).Seconds(),
+		Record(context.Background(), time.Since(outcome.decisionTime).Seconds(),
 			metric.WithAttributes(attribute.String("decision", "not_sampled")))
 }

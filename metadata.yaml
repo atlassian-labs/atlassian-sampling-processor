@@ -59,3 +59,11 @@ telemetry:
       sum:
         value_type: int
         monotonic: true
+    processor_atlassian_sampling_overly_eager_lonely_root_span_decisions:
+      enabled: true
+      description: Number of traces that have been aggressively sampled out by root span policy
+      unit: "{traces}"
+      sum:
+        value_type: int
+        monotonic: true
+

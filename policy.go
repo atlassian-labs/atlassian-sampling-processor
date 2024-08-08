@@ -13,6 +13,8 @@ import (
 type policy struct {
 	// name used to identify this policy instance.
 	name string
+	// type is used to identify this policy instance's policyType
+	policyType PolicyType
 	// evaluator that decides if a trace is sampled or not by this policy instance.
 	evaluator evaluators.PolicyEvaluator
 	// attribute to use in the telemetry to denote the policy.
@@ -35,9 +37,10 @@ func newPolicies(cfg []PolicyConfig) ([]*policy, error) {
 			return nil, err
 		}
 		p := &policy{
-			name:      policyCfg.Name,
-			evaluator: eval,
-			attribute: metric.WithAttributes(attribute.String("policy", policyCfg.Name)),
+			name:       policyCfg.Name,
+			policyType: policyCfg.Type,
+			evaluator:  eval,
+			attribute:  metric.WithAttributes(attribute.String("policy", policyCfg.Name)),
 		}
 		pols[i] = p
 	}
