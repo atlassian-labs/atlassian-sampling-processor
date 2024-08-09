@@ -32,11 +32,11 @@ Time that a trace ID spent in the decision cache before it was evicted
 
 ### processor_atlassian_sampling_overly_eager_lonely_root_span_decisions
 
-Number of traces that have been aggressively sampled out by root span policy
+Number of spans that have been aggressively sampled out by root span policy
 
 | Unit | Metric Type | Value Type | Monotonic |
 | ---- | ----------- | ---------- | --------- |
-| {traces} | Sum | Int | true |
+| {spans} | Sum | Int | true |
 
 ### processor_atlassian_sampling_policy_decisions
 

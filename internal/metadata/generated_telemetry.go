@@ -78,8 +78,8 @@ func NewTelemetryBuilder(settings component.TelemetrySettings, options ...teleme
 	errs = errors.Join(errs, err)
 	builder.ProcessorAtlassianSamplingOverlyEagerLonelyRootSpanDecisions, err = builder.meter.Int64Counter(
 		"processor_atlassian_sampling_overly_eager_lonely_root_span_decisions",
-		metric.WithDescription("Number of traces that have been aggressively sampled out by root span policy"),
-		metric.WithUnit("{traces}"),
+		metric.WithDescription("Number of spans that have been aggressively sampled out by root span policy"),
+		metric.WithUnit("{spans}"),
 	)
 	errs = errors.Join(errs, err)
 	builder.ProcessorAtlassianSamplingPolicyDecisions, err = builder.meter.Int64Counter(
