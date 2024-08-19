@@ -69,4 +69,8 @@ atlassian_sampling:
              ]
          }
        },
+      {
+        name: test-policy-8,
+        type: threshold
+      }
     ]

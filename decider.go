@@ -87,7 +87,8 @@ func getSharedPolicyEvaluator(cfg *SharedPolicyConfig) (evaluators.PolicyEvaluat
 	case OTTLCondition:
 		ottlcCfg := cfg.OTTLConditionConfig
 		return evaluators.NewOTTLConditionEvaluator(ottlcCfg.SpanConditions, ottlcCfg.SpanEventConditions, ottlcCfg.ErrorMode)
-
+	case Threshold:
+		return evaluators.NewThresholdEvaluator(), nil
 	default:
 		return nil, fmt.Errorf("unknown sampling policy type %s", cfg.Type)
 	}

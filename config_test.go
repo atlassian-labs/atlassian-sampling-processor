@@ -129,6 +129,12 @@ func TestLoadConfig(t *testing.T) {
 						},
 					},
 				},
+				{
+					SharedPolicyConfig: SharedPolicyConfig{
+						Name: "test-policy-8",
+						Type: Threshold,
+					},
+				},
 			},
 		})
 }

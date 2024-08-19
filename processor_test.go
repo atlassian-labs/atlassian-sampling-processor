@@ -251,12 +251,11 @@ func TestLonelyRootSpanPolicy_LateSpanIsHandled(t *testing.T) {
 	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
 
 	// We send a second span belonging to the same trace (late arriving span)
-	// Additionally, we need to block to allow the processor to finish processing our test trace to avoid a race
-	// This helps with that too
-
-	span2 := trace1.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	trace2 := ptrace.NewTraces()
+	span2 := trace2.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
 	span2.SetTraceID(testTraceID)
-	asp.incomingTraces <- ptrace.NewTraces()
+	require.NoError(t, asp.ConsumeTraces(ctx, trace2))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces())) // blocks until previous consumption is completed
 
 	// The late arriving span should not be sampled should not change the decision
 	assert.Equal(t, 0, sink.SpanCount())
@@ -269,5 +268,4 @@ func TestLonelyRootSpanPolicy_LateSpanIsHandled(t *testing.T) {
 	assert.Equal(t, "test_drop_lonely_root_span_policy", nsdValue.decisionPolicy.name)
 
 	require.NoError(t, asp.Shutdown(ctx))
-
 }

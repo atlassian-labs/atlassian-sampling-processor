@@ -110,4 +110,7 @@ const (
 	// OTTLCondition sample traces which match user provided OpenTelemetry Transformation Language
 	// conditions.
 	OTTLCondition PolicyType = "ottl_condition"
+	// Threshold retrieves the threshold from sampling.tail.threshold attribute.
+	// It compares the threshold to the trace ID.
+	Threshold PolicyType = "threshold"
 )
