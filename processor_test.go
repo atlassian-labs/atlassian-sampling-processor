@@ -21,6 +21,11 @@ var testTraceID pcommon.TraceID = [16]byte{
 	0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
 }
 
+var testTraceID2 pcommon.TraceID = [16]byte{
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+	0x08, 0x09, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15,
+}
+
 type mockDecider struct {
 	NextDecision       evaluators.Decision
 	NextDecisionPolicy *policy
@@ -94,6 +99,48 @@ func TestConsumeTraces_CachedDataIsSent(t *testing.T) {
 	// Both the first and second span should now have been released.
 	// The first one being cached, being released once the trace satisfies the policy.
 	assert.Equal(t, 2, sink.SpanCount())
+}
+
+func TestConsumeTraces_MultipleTracesInOneResourceSpan(t *testing.T) {
+	ctx := context.Background()
+	f := NewFactory()
+	cfg := (f.CreateDefaultConfig()).(*Config)
+
+	sink := &consumertest.TracesSink{}
+
+	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
+	require.NoError(t, err)
+	require.NotNil(t, asp)
+
+	decider := &mockDecider{NextDecision: evaluators.Sampled}
+	asp.decider = decider
+
+	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
+
+	// two different trace IDs, one resource span
+	trace := ptrace.NewTraces()
+	spans := trace.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans()
+	span1 := spans.AppendEmpty()
+	span1.SetTraceID(testTraceID)
+	span1.SetStartTimestamp(2)
+	span1.SetEndTimestamp(5)
+	span2 := spans.AppendEmpty()
+	span2.SetTraceID(testTraceID2)
+	span2.SetStartTimestamp(1)
+	span2.SetEndTimestamp(3)
+
+	require.NoError(t, asp.ConsumeTraces(ctx, trace))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+	require.NoError(t, asp.Shutdown(ctx))
+
+	// Sampled immediately, so not in cache
+	_, ok := asp.traceData.Get(testTraceID)
+	assert.False(t, ok)
+	_, ok = asp.traceData.Get(testTraceID2)
+	assert.False(t, ok)
+
+	assert.Equal(t, 2, sink.SpanCount())
+	require.Equal(t, 2, len(sink.AllTraces())) // initial trace is split into 2
 }
 
 func TestConsumeTraces_CacheMetadata(t *testing.T) {

@@ -230,7 +230,6 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 			}
 			asp.releaseSampledTrace(ctx, td.ReceivedBatches)
 			asp.telemetry.ProcessorAtlassianSamplingTracesSampled.Add(ctx, 1)
-			return
 		case evaluators.NotSampled:
 			// Cache decision, delete any associated data
 			asp.nonSampledDecisionCache.Put(id, &nsdOutcome{
@@ -239,7 +238,6 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 			})
 			asp.traceData.Delete(id)
 			asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
-			return
 		default:
 			// If we have reached here, the sampling decision is still pending, so we put trace data in the cache
 			if cachedData, ok := asp.traceData.Get(id); ok {
