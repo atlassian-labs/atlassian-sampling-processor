@@ -11,11 +11,25 @@ import (
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/processor/processortest"
+
+	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/evaluators"
+	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 )
 
 var testTraceID pcommon.TraceID = [16]byte{
 	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 	0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+}
+
+type mockDecider struct {
+	NextDecision       evaluators.Decision
+	NextDecisionPolicy *policy
+}
+
+var _ deciderI = (*mockDecider)(nil)
+
+func (m *mockDecider) MakeDecision(ctx context.Context, id pcommon.TraceID, currentTrace ptrace.Traces, mergedMetadata *tracedata.Metadata) (evaluators.Decision, *policy) {
+	return m.NextDecision, m.NextDecisionPolicy
 }
 
 func TestConsumeTraces_Basic(t *testing.T) {
@@ -47,16 +61,6 @@ func TestConsumeTraces_CachedDataIsSent(t *testing.T) {
 	cfg.MaxTraces = 100
 	cfg.DecisionCacheCfg.SampledCacheSize = 100
 	cfg.DecisionCacheCfg.NonSampledCacheSize = 100
-	cfg.PolicyConfig = []PolicyConfig{
-		{
-			SharedPolicyConfig: SharedPolicyConfig{
-				Name: "test",
-				Type: "span_count",
-				SpanCountConfig: SpanCountConfig{
-					MinSpans: 2,
-				}},
-		},
-	}
 
 	sink := &consumertest.TracesSink{}
 
@@ -64,19 +68,26 @@ func TestConsumeTraces_CachedDataIsSent(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, asp)
 
+	decider := &mockDecider{}
+	asp.decider = decider
+
 	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
 
 	trace1 := ptrace.NewTraces()
 	span := trace1.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
 	span.SetTraceID(testTraceID)
+
+	decider.NextDecision = evaluators.Pending
 	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
 
-	// Still pending because hasn't reached min span in trace of 2
+	// No span sent as decision is still pending
 	assert.Equal(t, 0, sink.SpanCount())
 
 	trace2 := ptrace.NewTraces()
 	span = trace2.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
 	span.SetTraceID(testTraceID)
+
+	decider.NextDecision = evaluators.Sampled
 	require.NoError(t, asp.ConsumeTraces(ctx, trace2))
 	require.NoError(t, asp.Shutdown(ctx))
 
@@ -89,20 +100,15 @@ func TestConsumeTraces_CacheMetadata(t *testing.T) {
 	ctx := context.Background()
 	f := NewFactory()
 	cfg := (f.CreateDefaultConfig()).(*Config)
-	cfg.PolicyConfig = []PolicyConfig{
-		{
-			SharedPolicyConfig: SharedPolicyConfig{
-				Name:                "test",
-				Type:                "probabilistic",
-				ProbabilisticConfig: ProbabilisticConfig{SamplingPercentage: 0}}, // never sample
-		},
-	}
 
 	sink := &consumertest.TracesSink{}
 
 	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
 	require.NoError(t, err)
 	require.NotNil(t, asp)
+
+	decider := &mockDecider{NextDecision: evaluators.Pending}
+	asp.decider = decider
 
 	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
 
@@ -147,19 +153,14 @@ func TestShutdown_Flushes(t *testing.T) {
 	f := NewFactory()
 	cfg := (f.CreateDefaultConfig()).(*Config)
 	cfg.FlushOnShutdown = true
-	cfg.PolicyConfig = []PolicyConfig{
-		{
-			SharedPolicyConfig: SharedPolicyConfig{
-				Name:                "test",
-				Type:                "probabilistic",
-				ProbabilisticConfig: ProbabilisticConfig{SamplingPercentage: 0}}, // never sample
-		},
-	}
 
 	sink := &consumertest.TracesSink{}
 	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
 	require.NoError(t, err)
 	require.NotNil(t, asp)
+
+	decider := &mockDecider{NextDecision: evaluators.Pending}
+	asp.decider = decider
 
 	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
 
@@ -222,26 +223,19 @@ func TestLonelyRootSpanPolicy_LateSpanIsHandled(t *testing.T) {
 	cfg.MaxTraces = 10
 	cfg.DecisionCacheCfg.SampledCacheSize = 10
 	cfg.DecisionCacheCfg.NonSampledCacheSize = 10
-	cfg.PolicyConfig = []PolicyConfig{
-		{
-			SharedPolicyConfig: SharedPolicyConfig{
-				Name: "test_drop_lonely_root_span_policy",
-				Type: "root_spans",
-			},
-			RootSpansConfig: RootSpansConfig{SharedPolicyConfig{
-				Name:                "aggressively_drop_lonely_root_spans",
-				Type:                Probabilistic,
-				ProbabilisticConfig: ProbabilisticConfig{SamplingPercentage: 0},
-			},
-			},
-		},
-	}
 
 	sink := &consumertest.TracesSink{}
 
 	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
 	require.NoError(t, err)
 	require.NotNil(t, asp)
+
+	p := &policy{
+		name:       "test_drop_lonely_root_span_policy",
+		policyType: "root_spans",
+	}
+	decider := &mockDecider{NextDecision: evaluators.NotSampled, NextDecisionPolicy: p}
+	asp.decider = decider
 
 	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
 
