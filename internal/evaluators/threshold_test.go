@@ -138,6 +138,17 @@ func TestThresholdEvaluator(t *testing.T) {
 	}
 }
 
+func TestSpanWithoutThreshold(t *testing.T) {
+	evaluator := NewThresholdEvaluator()
+	traceID := traceIDFromHex(t, "0000 0000 0000 0000 ffff ffff ffff ffff")
+	trace := ptrace.NewTraces()
+	span := trace.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span.SetTraceID(traceID)
+	decision, err := evaluator.Evaluate(context.Background(), traceID, trace, &tracedata.Metadata{})
+	require.NoError(t, err)
+	assert.Equal(t, Pending, decision)
+}
+
 func traceIDFromHex(t testing.TB, idStr string) pcommon.TraceID {
 	idStr = strings.Replace(idStr, " ", "", -1)
 	id := pcommon.NewTraceIDEmpty()
