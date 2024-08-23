@@ -84,6 +84,7 @@ func TestConsumeTraces_CachedDataIsSent(t *testing.T) {
 
 	decider.NextDecision = evaluators.Pending
 	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces())) // blocks until previous consumption is completed
 
 	// No span sent as decision is still pending
 	assert.Equal(t, 0, sink.SpanCount())
