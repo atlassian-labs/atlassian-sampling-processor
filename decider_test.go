@@ -24,14 +24,16 @@ type testPols struct {
 
 func setupTestPolicies() testPols {
 	return testPols{Policies: map[string]*policy{
-		"alwaysPending":  alwaysPending(),
-		"alwaysSample":   alwaysSample(),
-		"hardNotSampled": hardNotSampled(),
-		"alwaysError":    alwaysError(),
+		"alwaysPending":     alwaysPending(),
+		"alwaysSample":      alwaysSample(),
+		"hardNotSampled":    hardNotSampled(),
+		"alwaysLowPriority": alwaysLowPriority(),
+		"alwaysError":       alwaysError(),
 	}}
 }
 
 func TestMakeDecision(t *testing.T) {
+	t.Parallel()
 	testPols := setupTestPolicies()
 	tests := []struct {
 		name           string
@@ -70,7 +72,7 @@ func TestMakeDecision(t *testing.T) {
 			name: "Order matters, sampled first",
 			policies: []*policy{
 				testPols.Policies["alwaysSample"],
-				testPols.Policies["hardNotSampled"],
+				testPols.Policies["alwaysLowPriority"],
 			},
 			expectDecision: evaluators.Sampled,
 			expectPolicy:   testPols.Policies["alwaysSample"],
@@ -83,6 +85,15 @@ func TestMakeDecision(t *testing.T) {
 			},
 			expectDecision: evaluators.NotSampled,
 			expectPolicy:   testPols.Policies["hardNotSampled"],
+		},
+		{
+			name: "Order matters, LowPriority first",
+			policies: []*policy{
+				testPols.Policies["alwaysLowPriority"],
+				testPols.Policies["alwaysSample"],
+			},
+			expectDecision: evaluators.LowPriority,
+			expectPolicy:   testPols.Policies["alwaysLowPriority"],
 		},
 		{
 			name: "On all errors, returns pending",
@@ -142,25 +153,29 @@ func alwaysSample() *policy {
 func hardNotSampled() *policy {
 	return &policy{
 		name:      "returns NotSampled " + strconv.FormatUint(uint64(rand.Uint32()), 16),
-		evaluator: &hardNotSampledPolicy{},
+		evaluator: &staticTestEvaluator{d: evaluators.NotSampled},
+	}
+}
+
+func alwaysLowPriority() *policy {
+	return &policy{
+		name:      "returns LowPriority " + strconv.FormatUint(uint64(rand.Uint32()), 16),
+		evaluator: &staticTestEvaluator{d: evaluators.LowPriority},
 	}
 }
 
 func alwaysError() *policy {
 	return &policy{
 		name:      "always error " + strconv.FormatUint(uint64(rand.Uint32()), 16),
-		evaluator: &errorPolicy{},
+		evaluator: &staticTestEvaluator{d: evaluators.Unspecified, e: fmt.Errorf("test error")},
 	}
 }
 
-type errorPolicy struct{}
-
-func (ep *errorPolicy) Evaluate(_ context.Context, _ pcommon.TraceID, _ ptrace.Traces, _ *tracedata.Metadata) (evaluators.Decision, error) {
-	return evaluators.Unspecified, fmt.Errorf("test error")
+type staticTestEvaluator struct {
+	d evaluators.Decision
+	e error
 }
 
-type hardNotSampledPolicy struct{}
-
-func (p *hardNotSampledPolicy) Evaluate(_ context.Context, _ pcommon.TraceID, _ ptrace.Traces, _ *tracedata.Metadata) (evaluators.Decision, error) {
-	return evaluators.NotSampled, nil
+func (e *staticTestEvaluator) Evaluate(_ context.Context, _ pcommon.TraceID, _ ptrace.Traces, _ *tracedata.Metadata) (evaluators.Decision, error) {
+	return e.d, e.e
 }

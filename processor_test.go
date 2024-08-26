@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/collector/processor/processortest"
 
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/evaluators"
+	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/priority"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 )
 
@@ -24,6 +25,11 @@ var testTraceID pcommon.TraceID = [16]byte{
 var testTraceID2 pcommon.TraceID = [16]byte{
 	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 	0x08, 0x09, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15,
+}
+
+var testTraceID3 pcommon.TraceID = [16]byte{
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+	0xa0, 0xb9, 0xc0, 0xd1, 0xe2, 0xf3, 0xf1, 0xf2,
 }
 
 type mockDecider struct {
@@ -38,6 +44,7 @@ func (m *mockDecider) MakeDecision(ctx context.Context, id pcommon.TraceID, curr
 }
 
 func TestConsumeTraces_Basic(t *testing.T) {
+	t.Parallel()
 	f := NewFactory()
 	cfg := f.CreateDefaultConfig()
 
@@ -60,6 +67,7 @@ func TestConsumeTraces_Basic(t *testing.T) {
 }
 
 func TestConsumeTraces_CachedDataIsSent(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	f := NewFactory()
 	cfg := (f.CreateDefaultConfig()).(*Config)
@@ -103,6 +111,7 @@ func TestConsumeTraces_CachedDataIsSent(t *testing.T) {
 }
 
 func TestConsumeTraces_MultipleTracesInOneResourceSpan(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	f := NewFactory()
 	cfg := (f.CreateDefaultConfig()).(*Config)
@@ -145,6 +154,7 @@ func TestConsumeTraces_MultipleTracesInOneResourceSpan(t *testing.T) {
 }
 
 func TestConsumeTraces_CacheMetadata(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	f := NewFactory()
 	cfg := (f.CreateDefaultConfig()).(*Config)
@@ -196,7 +206,150 @@ func TestConsumeTraces_CacheMetadata(t *testing.T) {
 	assert.Equal(t, pcommon.Timestamp(8), cachedMetadata.LatestEndTime)
 }
 
+func TestConsumeTraces_TraceDataPrioritised(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := NewFactory()
+	cfg := (f.CreateDefaultConfig()).(*Config)
+	cfg.MaxTraces = 10 // 10 max traces -> 1 low priority cache size
+
+	sink := &consumertest.TracesSink{}
+
+	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
+	require.NoError(t, err)
+	require.NotNil(t, asp)
+
+	decider := &mockDecider{NextDecision: evaluators.LowPriority}
+	asp.decider = decider
+
+	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
+
+	// Consume first trace at low priority
+	trace1 := ptrace.NewTraces()
+	span1 := trace1.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span1.SetTraceID(testTraceID)
+	span1.SetStartTimestamp(2)
+	span1.SetEndTimestamp(5)
+	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	assert.Equal(t, 0, sink.SpanCount())
+	td, ok := asp.traceData.Get(testTraceID)
+	assert.True(t, ok)
+	assert.Equal(t, priority.Low, td.GetPriority())
+	assert.Equal(t, int64(1), td.Metadata.SpanCount.Load())
+
+	// Consume trace, same ID still low priority decision. Should be combined as low priority data
+	trace2 := ptrace.NewTraces()
+	span2 := trace2.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span2.SetTraceID(testTraceID)
+	span2.SetStartTimestamp(1)
+	span2.SetEndTimestamp(3)
+	require.NoError(t, asp.ConsumeTraces(ctx, trace2))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	assert.Equal(t, 0, sink.SpanCount())
+	td, ok = asp.traceData.Get(testTraceID)
+	assert.True(t, ok)
+	assert.Equal(t, priority.Low, td.GetPriority())
+	assert.Equal(t, int64(2), td.Metadata.SpanCount.Load())
+
+	// Consume second trace with new ID, also low priority.
+	// Size of low priority cache should be 1, so this should evict the existing low priority trace.
+	trace3 := ptrace.NewTraces()
+	span3 := trace3.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span3.SetTraceID(testTraceID2)
+	span3.SetStartTimestamp(1)
+	span3.SetEndTimestamp(3)
+	require.NoError(t, asp.ConsumeTraces(ctx, trace3))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	assert.Equal(t, 0, sink.SpanCount())
+	_, ok = asp.traceData.Get(testTraceID)
+	assert.False(t, ok)
+	td, ok = asp.traceData.Get(testTraceID2)
+	assert.True(t, ok)
+	assert.Equal(t, priority.Low, td.GetPriority())
+	assert.Equal(t, int64(1), td.Metadata.SpanCount.Load())
+
+	// promote testTraceID2 into regular priority
+	decider.NextDecision = evaluators.Pending
+	require.NoError(t, asp.ConsumeTraces(ctx, trace3))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+	td, ok = asp.traceData.Get(testTraceID2)
+	assert.True(t, ok)
+	assert.Equal(t, priority.Unspecified, td.GetPriority())
+	assert.Equal(t, int64(2), td.Metadata.SpanCount.Load())
+
+	// Other low priority decisions now shouldn't evict traceID2
+	decider.NextDecision = evaluators.LowPriority
+	trace4 := ptrace.NewTraces()
+	span4 := trace4.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span4.SetTraceID(testTraceID3)
+	span4.SetStartTimestamp(1)
+	span4.SetEndTimestamp(3)
+	require.NoError(t, asp.ConsumeTraces(ctx, trace4))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	td, ok = asp.traceData.Get(testTraceID2)
+	assert.True(t, ok)
+	assert.Equal(t, priority.Unspecified, td.GetPriority())
+	assert.Equal(t, int64(2), td.Metadata.SpanCount.Load())
+
+	td, ok = asp.traceData.Get(testTraceID3)
+	assert.True(t, ok)
+	assert.Equal(t, priority.Low, td.GetPriority())
+	assert.Equal(t, int64(1), td.Metadata.SpanCount.Load())
+
+	require.NoError(t, asp.Shutdown(ctx))
+}
+
+func TestConsumeTraces_PriorityNotDemoted(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := NewFactory()
+	cfg := (f.CreateDefaultConfig()).(*Config)
+
+	sink := &consumertest.TracesSink{}
+
+	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
+	require.NoError(t, err)
+	require.NotNil(t, asp)
+
+	decider := &mockDecider{NextDecision: evaluators.Pending}
+	asp.decider = decider
+
+	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
+
+	// Consume first trace, should be put in regular priority cache
+	trace1 := ptrace.NewTraces()
+	span1 := trace1.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span1.SetTraceID(testTraceID)
+	span1.SetStartTimestamp(2)
+	span1.SetEndTimestamp(5)
+	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	td, ok := asp.traceData.Get(testTraceID)
+	assert.True(t, ok)
+	assert.Equal(t, priority.Unspecified, td.GetPriority())
+	assert.Equal(t, int64(1), td.Metadata.SpanCount.Load())
+
+	// Consume again, should remain unspecified priority
+	decider.NextDecision = evaluators.LowPriority
+	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	td, ok = asp.traceData.Get(testTraceID)
+	assert.True(t, ok)
+	assert.Equal(t, priority.Unspecified, td.GetPriority())
+	assert.Equal(t, int64(2), td.Metadata.SpanCount.Load())
+
+	require.NoError(t, asp.Shutdown(ctx))
+}
+
 func TestShutdown_Flushes(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	f := NewFactory()
 	cfg := (f.CreateDefaultConfig()).(*Config)
@@ -265,6 +418,7 @@ func TestShutdown_TimesOut(t *testing.T) {
 }
 
 func TestLonelyRootSpanPolicy_LateSpanIsHandled(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	f := NewFactory()
 	cfg := (f.CreateDefaultConfig()).(*Config)

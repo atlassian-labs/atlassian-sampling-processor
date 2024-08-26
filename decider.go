@@ -47,7 +47,7 @@ func (d *decider) MakeDecision(ctx context.Context, id pcommon.TraceID, currentT
 			attribute.String("policy", p.name),
 			attribute.String("decision", decision.String()),
 		))
-		if decision == evaluators.Sampled || decision == evaluators.NotSampled {
+		if decision == evaluators.Sampled || decision == evaluators.NotSampled || decision == evaluators.LowPriority {
 			return decision, p
 		}
 	}

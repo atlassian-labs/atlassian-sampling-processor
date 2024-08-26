@@ -27,6 +27,8 @@ const (
 	Sampled
 	// NotSampled is used to indicate that the decision has been taken to not sample the data, and it should be dropped.
 	NotSampled
+	// LowPriority indicates that this trace is unlikely to be eventually sampled.
+	LowPriority
 )
 
 func (d Decision) String() string {
@@ -39,6 +41,8 @@ func (d Decision) String() string {
 		return "Sampled"
 	case NotSampled:
 		return "NotSampled"
+	case LowPriority:
+		return "LowPriority"
 	}
 	return ""
 }

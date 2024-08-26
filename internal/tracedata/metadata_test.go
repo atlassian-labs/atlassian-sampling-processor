@@ -10,6 +10,7 @@ import (
 )
 
 func TestMetadataDeepCopy(t *testing.T) {
+	t.Parallel()
 	sc := &atomic.Int64{}
 	sc.Store(1)
 	m1 := &Metadata{

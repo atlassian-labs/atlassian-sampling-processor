@@ -15,4 +15,6 @@ func TestDecisionStringer(t *testing.T) {
 	assert.Equal(t, "Sampled", d.String())
 	d = NotSampled
 	assert.Equal(t, "NotSampled", d.String())
+	d = LowPriority
+	assert.Equal(t, "LowPriority", d.String())
 }

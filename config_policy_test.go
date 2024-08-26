@@ -13,6 +13,7 @@ import (
 )
 
 func TestPolicyCreationFromConfig(t *testing.T) {
+	t.Parallel()
 	cm, err := confmaptest.LoadConf(filepath.Join("testdata", "atlassian_sampling_test_cfg.yml"))
 	require.NoError(t, err)
 	factory := NewFactory()

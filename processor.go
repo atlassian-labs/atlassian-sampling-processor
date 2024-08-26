@@ -21,6 +21,7 @@ import (
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/cache"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/evaluators"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/metadata"
+	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/priority"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 )
 
@@ -79,22 +80,33 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 		flushOnShutdown: cfg.FlushOnShutdown,
 	}
 
-	traceData, err := cache.NewLRUCache[*tracedata.TraceData](cfg.MaxTraces, asp.onEvictTrace, telemetry)
+	primaryCache, err := cache.NewLRUCache[*tracedata.TraceData](
+		cfg.MaxTraces,
+		asp.newTraceEvictionCallback("primary"),
+		telemetry)
 	if err != nil {
 		return nil, err
 	}
-	sdc, err := cache.NewLRUCache[time.Time](cfg.SampledCacheSize, asp.onEvictSampled, telemetry)
+	secondaryCache, err := cache.NewLRUCache[*tracedata.TraceData](
+		cfg.MaxTraces/10,
+		asp.newTraceEvictionCallback("secondary"),
+		telemetry)
 	if err != nil {
 		return nil, err
 	}
-	nsdc, err := cache.NewLRUCache[*nsdOutcome](cfg.NonSampledCacheSize, asp.onEvictNotSampled, telemetry)
+	asp.traceData, err = cache.NewTieredCache[*tracedata.TraceData](primaryCache, secondaryCache)
 	if err != nil {
 		return nil, err
 	}
 
-	asp.traceData = traceData
-	asp.sampledDecisionCache = sdc
-	asp.nonSampledDecisionCache = nsdc
+	asp.sampledDecisionCache, err = cache.NewLRUCache[time.Time](cfg.SampledCacheSize, asp.onEvictSampled, telemetry)
+	if err != nil {
+		return nil, err
+	}
+	asp.nonSampledDecisionCache, err = cache.NewLRUCache[*nsdOutcome](cfg.NonSampledCacheSize, asp.onEvictNotSampled, telemetry)
+	if err != nil {
+		return nil, err
+	}
 
 	pols, err := newPolicies(cfg.PolicyConfig)
 	if err != nil {
@@ -208,7 +220,7 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 
 		currentTrace := ptrace.NewTraces()
 		appendToTraces(currentTrace, resourceSpans, spans)
-		td := tracedata.NewTraceData(time.Now(), currentTrace)
+		td := tracedata.NewTraceData(time.Now(), currentTrace, priority.Unspecified)
 
 		// Merge metadata with any metadata in the cache to pass to evaluators
 		mergedMetadata := td.Metadata.DeepCopy()
@@ -240,11 +252,18 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 			asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
 		default:
 			// If we have reached here, the sampling decision is still pending, so we put trace data in the cache
-			if cachedData, ok := asp.traceData.Get(id); ok {
-				cachedData.MergeWith(td)
-			} else {
-				asp.traceData.Put(id, td)
+
+			// Priority of the metadata will affect the cache tier
+			if finalDecision == evaluators.LowPriority {
+				td.Metadata.Priority = priority.Low
 			}
+
+			mergedData := td
+			if cachedData, ok := asp.traceData.Get(id); ok {
+				cachedData.MergeWith(td) // chooses higher priority in merge
+				mergedData = cachedData
+			}
+			asp.traceData.Put(id, mergedData)
 		}
 	}
 }
@@ -314,27 +333,34 @@ func (asp *atlassianSamplingProcessor) flushAll(ctx context.Context) error {
 	return err
 }
 
-func (asp *atlassianSamplingProcessor) onEvictTrace(id uint64, td *tracedata.TraceData) {
-	ctx := context.Background()
-	asp.log.Debug("evicting trace from cache", zap.Uint64("traceID", id))
-	asp.telemetry.ProcessorAtlassianSamplingTraceEvictionTime.
-		Record(ctx, time.Since(td.Metadata.ArrivalTime).Seconds())
-	// Convert back to [16]byte to query. We only need the right 8-bytes from the uint64,
-	// since the cache only uses the right 8 bytes.
-	idArr := pcommon.NewTraceIDEmpty()
-	binary.LittleEndian.PutUint64(idArr[8:16], id)
-	// Double check that we didn't actually sample this trace
-	if _, ok := asp.sampledDecisionCache.Get(idArr); !ok {
-		// Mark as not sampled
-		asp.nonSampledDecisionCache.Put(idArr, &nsdOutcome{
-			decisionTime:   time.Now(),
-			decisionPolicy: nil,
-		})
-		asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
-		asp.telemetry.ProcessorAtlassianSamplingPolicyDecisions.Add(ctx, 1, metric.WithAttributes(
-			attribute.String("policy", "evicted"),
-			attribute.String("decision", evaluators.NotSampled.String()),
-		))
+func (asp *atlassianSamplingProcessor) newTraceEvictionCallback(cacheName string) func(id uint64, td *tracedata.TraceData) {
+	return func(id uint64, td *tracedata.TraceData) {
+		ctx := context.Background()
+		asp.log.Debug("evicting trace from cache",
+			zap.Uint64("traceID", id),
+			zap.String("cache", cacheName))
+		asp.telemetry.ProcessorAtlassianSamplingTraceEvictionTime.
+			Record(ctx, time.Since(td.Metadata.ArrivalTime).Seconds(),
+				metric.WithAttributes(attribute.String("cache", cacheName)))
+		// Convert back to [16]byte to query. We only need the right 8-bytes from the uint64,
+		// since the cache only uses the right 8 bytes.
+		idArr := pcommon.NewTraceIDEmpty()
+		binary.LittleEndian.PutUint64(idArr[8:16], id)
+		// Double check that we didn't actually sample this trace
+		if _, ok := asp.sampledDecisionCache.Get(idArr); !ok {
+			// Mark as not sampled
+			asp.nonSampledDecisionCache.Put(idArr, &nsdOutcome{
+				decisionTime:   time.Now(),
+				decisionPolicy: nil,
+			})
+			asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
+			asp.telemetry.ProcessorAtlassianSamplingPolicyDecisions.Add(ctx, 1,
+				metric.WithAttributes(
+					attribute.String("policy", "evicted"),
+					attribute.String("decision", evaluators.NotSampled.String()),
+					attribute.String("cache", cacheName),
+				))
+		}
 	}
 }
 

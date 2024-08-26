@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"go.opentelemetry.io/collector/pdata/ptrace"
+
+	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/priority"
 )
 
 // TraceData stores the sampling related trace data.
@@ -16,13 +18,16 @@ type TraceData struct {
 	ReceivedBatches ptrace.Traces
 }
 
-func NewTraceData(arrival time.Time, traces ptrace.Traces) *TraceData {
+var _ priority.Getter = (*TraceData)(nil)
+
+func NewTraceData(arrival time.Time, traces ptrace.Traces, p priority.Priority) *TraceData {
 	spanCount := &atomic.Int64{}
 	spanCount.Store(int64(traces.SpanCount()))
 
 	metadata := &Metadata{
 		ArrivalTime: arrival,
 		SpanCount:   spanCount,
+		Priority:    p,
 	}
 
 	// Calculate earliest start and latest end
@@ -62,4 +67,9 @@ func (td *TraceData) MergeWith(other *TraceData) {
 		dest := td.ReceivedBatches.ResourceSpans().AppendEmpty()
 		rs.CopyTo(dest)
 	}
+}
+
+// GetPriority implements priority.Getter
+func (td *TraceData) GetPriority() priority.Priority {
+	return td.Metadata.Priority
 }

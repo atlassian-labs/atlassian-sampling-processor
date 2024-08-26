@@ -8,6 +8,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 
+	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/priority"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 )
 
@@ -25,31 +26,36 @@ func NewRootSpan(subPolicy PolicyEvaluator) PolicyEvaluator {
 	}
 }
 
-// Evaluate evaluates if a span is a root span without children.
-// If it has no children, it evaluates the sub policy turning Pending decisions into NotSampled.
+// Evaluate evaluates a sub policy, and if it returns Sampled, converts the decision to Pending.
+// Then, if the trace data only contains a single root span with no children, then the decision is LowPriority.
+// Once the metadata of this mergedMetadata has a LowPriority decision, it must get a Sampled result
+// from the sub policy to be promoted to a regular Pending.
 func (r *rootSpansEvaluator) Evaluate(ctx context.Context, traceID pcommon.TraceID, currentTrace ptrace.Traces, mergedMetadata *tracedata.Metadata) (Decision, error) {
-	if mergedMetadata.SpanCount.Load() != 1 {
-		return Pending, nil
-	}
-
-	// we know there's only one span so check that span if it's a root span
-	onlySpan := findOnlySpan(currentTrace)
-	if onlySpan == nil {
-		return Unspecified, fmt.Errorf("span count was 1 but no span in trace data, tracedata invalid/corrupt")
-	}
-	if !isRootSpan(*onlySpan) {
-		return Pending, nil
+	defaultDecision := Pending
+	if mergedMetadata.Priority == priority.Low {
+		defaultDecision = LowPriority
 	}
 
 	subDecision, err := r.subPolicy.Evaluate(ctx, traceID, currentTrace, mergedMetadata)
 	if err != nil {
 		return Unspecified, err
 	}
-
-	if subDecision == NotSampled || subDecision == Pending {
-		return NotSampled, nil
+	if subDecision == Sampled {
+		return Pending, nil
 	}
-	return Pending, nil
+
+	if mergedMetadata.SpanCount.Load() != 1 {
+		return defaultDecision, nil
+	}
+	// we know there's only one span so check that span if it's a root span
+	onlySpan := findOnlySpan(currentTrace)
+	if onlySpan == nil {
+		return Unspecified, fmt.Errorf("span count was 1 but no span in trace data, tracedata invalid/corrupt")
+	}
+	if isRootSpan(*onlySpan) {
+		return LowPriority, nil
+	}
+	return defaultDecision, nil
 }
 
 // findOnlySpan returns the first span it sees in the traces.
