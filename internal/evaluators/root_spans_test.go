@@ -3,7 +3,6 @@ package evaluators
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,7 +28,7 @@ func TestRootSpanEvaluator(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name           string
-		spanCount      int
+		spanCount      int32
 		traceID        pcommon.TraceID
 		trace          ptrace.Traces
 		subPolicy      PolicyEvaluator
@@ -154,9 +153,7 @@ func TestRootSpanEvaluator(t *testing.T) {
 			if p == nil {
 				p = &unspecified
 			}
-			sc := &atomic.Int64{}
-			sc.Store(int64(test.spanCount))
-			metadata := &tracedata.Metadata{SpanCount: sc, Priority: *p}
+			metadata := &tracedata.Metadata{SpanCount: test.spanCount, Priority: *p}
 
 			decision, err := evaluator.Evaluate(
 				context.Background(),
@@ -176,9 +173,7 @@ func TestRootSpanEvaluatorErrored(t *testing.T) {
 	trace := ptrace.NewTraces()
 	trace.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
 
-	sc := &atomic.Int64{}
-	sc.Store(int64(1))
-	metadata := &tracedata.Metadata{SpanCount: sc}
+	metadata := &tracedata.Metadata{SpanCount: 1}
 
 	decision, err := eval.Evaluate(
 		context.Background(),

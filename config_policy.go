@@ -63,7 +63,7 @@ type ProbabilisticConfig struct {
 // policy evaluator
 type SpanCountConfig struct {
 	// Minimum number of spans in a Trace
-	MinSpans int `mapstructure:"min_spans"`
+	MinSpans int32 `mapstructure:"min_spans"`
 }
 
 type RootSpansConfig struct {

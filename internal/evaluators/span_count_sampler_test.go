@@ -8,7 +8,6 @@ package evaluators
 
 import (
 	"context"
-	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,14 +18,14 @@ import (
 )
 
 func TestEvaluate(t *testing.T) {
-	minSpans := 3
+	minSpans := int32(3)
 
 	traceID := pcommon.TraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
 
 	cases := []struct {
 		Desc             string
-		NumberSpans      int
-		NumberCachedSpan int
+		NumberSpans      int32
+		NumberCachedSpan int32
 		Decision         Decision
 	}{
 		{
@@ -60,10 +59,10 @@ func TestEvaluate(t *testing.T) {
 	}
 }
 
-func newTraceWithMultipleSpans(numberSpans int) ptrace.Traces {
+func newTraceWithMultipleSpans(numberSpans int32) ptrace.Traces {
 	// For each resource, going to create the number of spans defined in the array
 	traces := ptrace.NewTraces()
-	for i := 0; i < numberSpans; i++ {
+	for i := 0; i < int(numberSpans); i++ {
 		// Creates trace
 		rs := traces.ResourceSpans().AppendEmpty()
 		ils := rs.ScopeSpans().AppendEmpty()
@@ -76,10 +75,8 @@ func newTraceWithMultipleSpans(numberSpans int) ptrace.Traces {
 	return traces
 }
 
-func newMergedMetadata(numberSpans int, numberCachedSpans int) *tracedata.Metadata {
-	sc := &atomic.Int64{}
-	sc.Store(int64(numberSpans + numberCachedSpans))
+func newMergedMetadata(numberSpans int32, numberCachedSpans int32) *tracedata.Metadata {
 	return &tracedata.Metadata{
-		SpanCount: sc,
+		SpanCount: numberSpans + numberCachedSpans,
 	}
 }

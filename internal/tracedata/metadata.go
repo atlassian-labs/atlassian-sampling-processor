@@ -2,7 +2,6 @@ package tracedata // import "bitbucket.org/atlassian/observability-sidecar/pkg/p
 
 import (
 	"slices"
-	"sync/atomic"
 	"time"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
@@ -18,7 +17,7 @@ type Metadata struct {
 	// LatestEndTime is the latest time of the latest end to a span that we've seen for this trace.
 	LatestEndTime pcommon.Timestamp
 	// SpanCount track the number of spans on the trace.
-	SpanCount *atomic.Int64
+	SpanCount int32
 	// Priority of the trace data. May be used to tier caching.
 	Priority priority.Priority
 }
@@ -26,7 +25,7 @@ type Metadata struct {
 // MergeWith merges the data from the other Metadata into this Metadata
 // It modifies the current Metadata instance(i.e. `m`) but does not modify the other Metadata provided(i.e. `other`)
 func (m *Metadata) MergeWith(other *Metadata) {
-	m.SpanCount.Add(other.SpanCount.Load())
+	m.SpanCount += other.SpanCount
 
 	if other.ArrivalTime.Before(m.ArrivalTime) {
 		m.ArrivalTime = other.ArrivalTime
@@ -39,10 +38,5 @@ func (m *Metadata) MergeWith(other *Metadata) {
 // DeepCopy returns a deep copy of this Metadata
 func (m *Metadata) DeepCopy() *Metadata {
 	dup := *m
-
-	spanCount := &atomic.Int64{}
-	spanCount.Store(m.SpanCount.Load())
-	dup.SpanCount = spanCount
-
 	return &dup
 }

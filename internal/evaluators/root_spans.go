@@ -44,7 +44,7 @@ func (r *rootSpansEvaluator) Evaluate(ctx context.Context, traceID pcommon.Trace
 		return Pending, nil
 	}
 
-	if mergedMetadata.SpanCount.Load() != 1 {
+	if mergedMetadata.SpanCount != 1 {
 		return defaultDecision, nil
 	}
 	// we know there's only one span so check that span if it's a root span

@@ -18,7 +18,7 @@ func TestCreation(t *testing.T) {
 	now := time.Now()
 	td := NewTraceData(now, trace, priority.Low)
 	m := td.Metadata
-	assert.Equal(t, int64(1), m.SpanCount.Load())
+	assert.Equal(t, int32(1), m.SpanCount)
 	assert.Equal(t, now, m.ArrivalTime)
 }
 
@@ -38,7 +38,7 @@ func TestMerge(t *testing.T) {
 	td1.MergeWith(td2)
 	m1 := td1.Metadata
 
-	assert.Equal(t, int64(2), m1.SpanCount.Load())
+	assert.Equal(t, int32(2), m1.SpanCount)
 	assert.Equal(t, 2, td1.GetTraces().ResourceSpans().Len())
 	assert.Equal(t, pcommon.Timestamp(1), m1.EarliestStartTime)
 	assert.Equal(t, pcommon.Timestamp(4), m1.LatestEndTime)
@@ -47,6 +47,7 @@ func TestMerge(t *testing.T) {
 }
 
 func TestMerge_OtherIsEarlier(t *testing.T) {
+	t.Parallel()
 	trace1 := ptrace.NewTraces()
 	span1 := trace1.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
 	span1.SetStartTimestamp(1)
@@ -61,7 +62,7 @@ func TestMerge_OtherIsEarlier(t *testing.T) {
 	td1.MergeWith(td2)
 	m1 := td1.Metadata
 
-	assert.Equal(t, int64(2), m1.SpanCount.Load())
+	assert.Equal(t, int32(2), m1.SpanCount)
 	assert.Equal(t, 2, td1.GetTraces().ResourceSpans().Len())
 	assert.Equal(t, pcommon.Timestamp(1), m1.EarliestStartTime)
 	assert.Equal(t, pcommon.Timestamp(4), m1.LatestEndTime)

@@ -16,21 +16,21 @@ import (
 )
 
 type spanCount struct {
-	minSpans int
+	minSpans int32
 }
 
 var _ PolicyEvaluator = (*spanCount)(nil)
 
 // NewSpanCount creates a policy evaluator sampling traces with more than one span per trace
-func NewSpanCount(minSpans int) PolicyEvaluator {
+func NewSpanCount(minSpans int32) PolicyEvaluator {
 	return &spanCount{
 		minSpans: minSpans,
 	}
 }
 
 // Evaluate looks at the trace data and returns a corresponding SamplingDecision.
-func (sc *spanCount) Evaluate(_ context.Context, id pcommon.TraceID, currentTrace ptrace.Traces, mergedMetadata *tracedata.Metadata) (Decision, error) {
-	if int(mergedMetadata.SpanCount.Load()) >= sc.minSpans {
+func (sc *spanCount) Evaluate(_ context.Context, _ pcommon.TraceID, _ ptrace.Traces, mergedMetadata *tracedata.Metadata) (Decision, error) {
+	if mergedMetadata.SpanCount >= sc.minSpans {
 		return Sampled, nil
 	}
 	return Pending, nil

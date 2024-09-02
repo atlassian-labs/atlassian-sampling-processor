@@ -1,7 +1,6 @@
 package tracedata // import "bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 
 import (
-	"sync/atomic"
 	"time"
 
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -21,12 +20,9 @@ type TraceData struct {
 var _ priority.Getter = (*TraceData)(nil)
 
 func NewTraceData(arrival time.Time, traces ptrace.Traces, p priority.Priority) *TraceData {
-	spanCount := &atomic.Int64{}
-	spanCount.Store(int64(traces.SpanCount()))
-
 	metadata := &Metadata{
 		ArrivalTime: arrival,
-		SpanCount:   spanCount,
+		SpanCount:   int32(traces.SpanCount()), //nolint G115: integer overflow conversion int
 		Priority:    p,
 	}
 

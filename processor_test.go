@@ -201,7 +201,7 @@ func TestConsumeTraces_CacheMetadata(t *testing.T) {
 	require.Equal(t, true, ok)
 
 	cachedMetadata := cachedData.Metadata
-	assert.Equal(t, int64(3), cachedMetadata.SpanCount.Load())
+	assert.Equal(t, int32(3), cachedMetadata.SpanCount)
 	assert.Equal(t, pcommon.Timestamp(1), cachedMetadata.EarliestStartTime)
 	assert.Equal(t, pcommon.Timestamp(8), cachedMetadata.LatestEndTime)
 }
@@ -237,7 +237,7 @@ func TestConsumeTraces_TraceDataPrioritised(t *testing.T) {
 	td, ok := asp.traceData.Get(testTraceID)
 	assert.True(t, ok)
 	assert.Equal(t, priority.Low, td.GetPriority())
-	assert.Equal(t, int64(1), td.Metadata.SpanCount.Load())
+	assert.Equal(t, int32(1), td.Metadata.SpanCount)
 
 	// Consume trace, same ID still low priority decision. Should be combined as low priority data
 	trace2 := ptrace.NewTraces()
@@ -252,7 +252,7 @@ func TestConsumeTraces_TraceDataPrioritised(t *testing.T) {
 	td, ok = asp.traceData.Get(testTraceID)
 	assert.True(t, ok)
 	assert.Equal(t, priority.Low, td.GetPriority())
-	assert.Equal(t, int64(2), td.Metadata.SpanCount.Load())
+	assert.Equal(t, int32(2), td.Metadata.SpanCount)
 
 	// Consume second trace with new ID, also low priority.
 	// Size of low priority cache should be 1, so this should evict the existing low priority trace.
@@ -270,7 +270,7 @@ func TestConsumeTraces_TraceDataPrioritised(t *testing.T) {
 	td, ok = asp.traceData.Get(testTraceID2)
 	assert.True(t, ok)
 	assert.Equal(t, priority.Low, td.GetPriority())
-	assert.Equal(t, int64(1), td.Metadata.SpanCount.Load())
+	assert.Equal(t, int32(1), td.Metadata.SpanCount)
 
 	// promote testTraceID2 into regular priority
 	decider.NextDecision = evaluators.Pending
@@ -279,7 +279,7 @@ func TestConsumeTraces_TraceDataPrioritised(t *testing.T) {
 	td, ok = asp.traceData.Get(testTraceID2)
 	assert.True(t, ok)
 	assert.Equal(t, priority.Unspecified, td.GetPriority())
-	assert.Equal(t, int64(2), td.Metadata.SpanCount.Load())
+	assert.Equal(t, int32(2), td.Metadata.SpanCount)
 
 	// Other low priority decisions now shouldn't evict traceID2
 	decider.NextDecision = evaluators.LowPriority
@@ -294,12 +294,12 @@ func TestConsumeTraces_TraceDataPrioritised(t *testing.T) {
 	td, ok = asp.traceData.Get(testTraceID2)
 	assert.True(t, ok)
 	assert.Equal(t, priority.Unspecified, td.GetPriority())
-	assert.Equal(t, int64(2), td.Metadata.SpanCount.Load())
+	assert.Equal(t, int32(2), td.Metadata.SpanCount)
 
 	td, ok = asp.traceData.Get(testTraceID3)
 	assert.True(t, ok)
 	assert.Equal(t, priority.Low, td.GetPriority())
-	assert.Equal(t, int64(1), td.Metadata.SpanCount.Load())
+	assert.Equal(t, int32(1), td.Metadata.SpanCount)
 
 	require.NoError(t, asp.Shutdown(ctx))
 }
@@ -333,7 +333,7 @@ func TestConsumeTraces_PriorityNotDemoted(t *testing.T) {
 	td, ok := asp.traceData.Get(testTraceID)
 	assert.True(t, ok)
 	assert.Equal(t, priority.Unspecified, td.GetPriority())
-	assert.Equal(t, int64(1), td.Metadata.SpanCount.Load())
+	assert.Equal(t, int32(1), td.Metadata.SpanCount)
 
 	// Consume again, should remain unspecified priority
 	decider.NextDecision = evaluators.LowPriority
@@ -343,7 +343,7 @@ func TestConsumeTraces_PriorityNotDemoted(t *testing.T) {
 	td, ok = asp.traceData.Get(testTraceID)
 	assert.True(t, ok)
 	assert.Equal(t, priority.Unspecified, td.GetPriority())
-	assert.Equal(t, int64(2), td.Metadata.SpanCount.Load())
+	assert.Equal(t, int32(2), td.Metadata.SpanCount)
 
 	require.NoError(t, asp.Shutdown(ctx))
 }
