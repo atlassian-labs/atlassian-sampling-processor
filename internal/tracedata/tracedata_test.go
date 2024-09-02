@@ -39,7 +39,7 @@ func TestMerge(t *testing.T) {
 	m1 := td1.Metadata
 
 	assert.Equal(t, int64(2), m1.SpanCount.Load())
-	assert.Equal(t, 2, td1.ReceivedBatches.ResourceSpans().Len())
+	assert.Equal(t, 2, td1.GetTraces().ResourceSpans().Len())
 	assert.Equal(t, pcommon.Timestamp(1), m1.EarliestStartTime)
 	assert.Equal(t, pcommon.Timestamp(4), m1.LatestEndTime)
 	assert.Equal(t, priority.Unspecified, td1.GetPriority())
@@ -62,9 +62,19 @@ func TestMerge_OtherIsEarlier(t *testing.T) {
 	m1 := td1.Metadata
 
 	assert.Equal(t, int64(2), m1.SpanCount.Load())
-	assert.Equal(t, 2, td1.ReceivedBatches.ResourceSpans().Len())
+	assert.Equal(t, 2, td1.GetTraces().ResourceSpans().Len())
 	assert.Equal(t, pcommon.Timestamp(1), m1.EarliestStartTime)
 	assert.Equal(t, pcommon.Timestamp(4), m1.LatestEndTime)
 	assert.Equal(t, priority.Unspecified, td1.GetPriority())
 	assert.Equal(t, priority.Unspecified, td2.GetPriority())
+}
+
+func TestGetTraces(t *testing.T) {
+	t.Parallel()
+	trace := ptrace.NewTraces()
+	trace.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+
+	td := NewTraceData(time.Now(), trace, priority.Unspecified)
+
+	assert.Equal(t, trace, td.GetTraces())
 }

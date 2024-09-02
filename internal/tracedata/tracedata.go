@@ -14,8 +14,8 @@ import (
 type TraceData struct {
 	Metadata *Metadata
 
-	// ReceivedBatches stores all the batches received for the trace.
-	ReceivedBatches ptrace.Traces
+	// receivedBatches stores all the batches received for the trace.
+	receivedBatches ptrace.Traces
 }
 
 var _ priority.Getter = (*TraceData)(nil)
@@ -53,7 +53,7 @@ func NewTraceData(arrival time.Time, traces ptrace.Traces, p priority.Priority) 
 
 	return &TraceData{
 		Metadata:        metadata,
-		ReceivedBatches: traces,
+		receivedBatches: traces,
 	}
 }
 
@@ -62,9 +62,9 @@ func NewTraceData(arrival time.Time, traces ptrace.Traces, p priority.Priority) 
 func (td *TraceData) MergeWith(other *TraceData) {
 	td.Metadata.MergeWith(other.Metadata)
 
-	for i := 0; i < other.ReceivedBatches.ResourceSpans().Len(); i++ {
-		rs := other.ReceivedBatches.ResourceSpans().At(i)
-		dest := td.ReceivedBatches.ResourceSpans().AppendEmpty()
+	for i := 0; i < other.receivedBatches.ResourceSpans().Len(); i++ {
+		rs := other.receivedBatches.ResourceSpans().At(i)
+		dest := td.receivedBatches.ResourceSpans().AppendEmpty()
 		rs.CopyTo(dest)
 	}
 }
@@ -72,4 +72,10 @@ func (td *TraceData) MergeWith(other *TraceData) {
 // GetPriority implements priority.Getter
 func (td *TraceData) GetPriority() priority.Priority {
 	return td.Metadata.Priority
+}
+
+// GetTraces returns all batches received for the trace
+// The traces returned should not be modified by the caller, MergeWith should be used to add data to a TraceData instead.
+func (td *TraceData) GetTraces() ptrace.Traces {
+	return td.receivedBatches
 }

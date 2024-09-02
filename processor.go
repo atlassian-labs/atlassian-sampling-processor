@@ -237,10 +237,10 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 			// Sample, cache decision, and release all data associated with the trace
 			asp.sampledDecisionCache.Put(id, time.Now())
 			if cachedData, ok := asp.traceData.Get(id); ok {
-				asp.releaseSampledTrace(ctx, cachedData.ReceivedBatches)
+				asp.releaseSampledTrace(ctx, cachedData.GetTraces())
 				asp.traceData.Delete(id)
 			}
-			asp.releaseSampledTrace(ctx, td.ReceivedBatches)
+			asp.releaseSampledTrace(ctx, td.GetTraces())
 			asp.telemetry.ProcessorAtlassianSamplingTracesSampled.Add(ctx, 1)
 		case evaluators.NotSampled:
 			// Cache decision, delete any associated data
@@ -311,7 +311,7 @@ func (asp *atlassianSamplingProcessor) flushAll(ctx context.Context) error {
 	for i, td := range vals {
 
 		// Increment flush count attribute
-		rs := td.ReceivedBatches.ResourceSpans()
+		rs := td.GetTraces().ResourceSpans()
 		for j := 0; j < rs.Len(); j++ {
 			var flushes int64 = 0
 			rsAttrs := rs.At(j).Resource().Attributes()
@@ -327,7 +327,7 @@ func (asp *atlassianSamplingProcessor) flushAll(ctx context.Context) error {
 				"flush could not complete due to context cancellation, "+
 				"only flushed %d out of %d traces: %w", i, len(vals), ctx.Err())
 		default:
-			err = multierr.Append(err, asp.next.ConsumeTraces(ctx, td.ReceivedBatches))
+			err = multierr.Append(err, asp.next.ConsumeTraces(ctx, td.GetTraces()))
 		}
 	}
 	return err
