@@ -18,6 +18,12 @@ import (
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/metadata"
 )
 
+// pre compute attributes for performance
+var (
+	trueAttr  = metric.WithAttributes(attribute.Bool("hit", true))
+	falseAttr = metric.WithAttributes(attribute.Bool("hit", false))
+)
+
 // lruCache implements Cache as a simple LRU cache.
 type lruCache[V any] struct {
 	cache     *lru.Cache[uint64, V]
@@ -39,8 +45,13 @@ func NewLRUCache[V any](size int, onEvicted func(uint64, V), telemetry *metadata
 
 func (c *lruCache[V]) Get(id pcommon.TraceID) (V, bool) {
 	v, ok := c.cache.Get(rightHalfTraceID(id))
-	c.telemetry.ProcessorAtlassianSamplingCacheReads.
-		Add(context.Background(), 1, metric.WithAttributes(attribute.Bool("hit", ok)))
+	if ok {
+		c.telemetry.ProcessorAtlassianSamplingCacheReads.
+			Add(context.Background(), 1, trueAttr)
+	} else {
+		c.telemetry.ProcessorAtlassianSamplingCacheReads.
+			Add(context.Background(), 1, falseAttr)
+	}
 	return v, ok
 }
 

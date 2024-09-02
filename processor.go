@@ -27,6 +27,11 @@ import (
 
 const flushCountKey = "atlassiansampling.flushes"
 
+var (
+	sampledAttr    = metric.WithAttributes(attribute.String("decision", "sampled"))
+	notSampledAttr = metric.WithAttributes(attribute.String("decision", "not_sampled"))
+)
+
 type atlassianSamplingProcessor struct {
 	next      consumer.Traces
 	telemetry *metadata.TelemetryBuilder
@@ -367,13 +372,11 @@ func (asp *atlassianSamplingProcessor) newTraceEvictionCallback(cacheName string
 func (asp *atlassianSamplingProcessor) onEvictSampled(id uint64, insertTime time.Time) {
 	asp.log.Debug("evicting sampled decision", zap.Uint64("traceID", id))
 	asp.telemetry.ProcessorAtlassianSamplingDecisionEvictionTime.
-		Record(context.Background(), time.Since(insertTime).Seconds(),
-			metric.WithAttributes(attribute.String("decision", "sampled")))
+		Record(context.Background(), time.Since(insertTime).Seconds(), sampledAttr)
 }
 
 func (asp *atlassianSamplingProcessor) onEvictNotSampled(id uint64, outcome *nsdOutcome) {
 	asp.log.Debug("evicting not-sampled decision", zap.Uint64("traceID", id))
 	asp.telemetry.ProcessorAtlassianSamplingDecisionEvictionTime.
-		Record(context.Background(), time.Since(outcome.decisionTime).Seconds(),
-			metric.WithAttributes(attribute.String("decision", "not_sampled")))
+		Record(context.Background(), time.Since(outcome.decisionTime).Seconds(), notSampledAttr)
 }
