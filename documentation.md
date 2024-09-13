@@ -6,7 +6,7 @@
 
 The following telemetry is emitted by this component.
 
-### processor_atlassian_sampling_cache_reads
+### otelcol_processor_atlassian_sampling_cache_reads
 
 Amount of times a cache was read from
 
@@ -14,7 +14,7 @@ Amount of times a cache was read from
 | ---- | ----------- | ---------- | --------- |
 | {accesses} | Sum | Int | true |
 
-### processor_atlassian_sampling_chan_blocking_time
+### otelcol_processor_atlassian_sampling_chan_blocking_time
 
 Amount of time spent blocking on the chan send in ConsumeTraces()
 
@@ -22,7 +22,7 @@ Amount of time spent blocking on the chan send in ConsumeTraces()
 | ---- | ----------- | ---------- |
 | ns | Histogram | Int |
 
-### processor_atlassian_sampling_decision_eviction_time
+### otelcol_processor_atlassian_sampling_decision_eviction_time
 
 Time that a trace ID spent in the decision cache before it was evicted
 
@@ -30,7 +30,7 @@ Time that a trace ID spent in the decision cache before it was evicted
 | ---- | ----------- | ---------- |
 | s | Gauge | Double |
 
-### processor_atlassian_sampling_overly_eager_lonely_root_span_decisions
+### otelcol_processor_atlassian_sampling_overly_eager_lonely_root_span_decisions
 
 Number of spans that have been aggressively sampled out by root span policy
 
@@ -38,7 +38,7 @@ Number of spans that have been aggressively sampled out by root span policy
 | ---- | ----------- | ---------- | --------- |
 | {spans} | Sum | Int | true |
 
-### processor_atlassian_sampling_policy_decisions
+### otelcol_processor_atlassian_sampling_policy_decisions
 
 Sampling decisions made specifying policy and decision.
 
@@ -46,7 +46,7 @@ Sampling decisions made specifying policy and decision.
 | ---- | ----------- | ---------- | --------- |
 | {decisions} | Sum | Int | true |
 
-### processor_atlassian_sampling_trace_eviction_time
+### otelcol_processor_atlassian_sampling_trace_eviction_time
 
 Time that a non-sampled trace was kept in memory from arrival to being evicted
 
@@ -54,7 +54,7 @@ Time that a non-sampled trace was kept in memory from arrival to being evicted
 | ---- | ----------- | ---------- |
 | s | Gauge | Double |
 
-### processor_atlassian_sampling_traces_not_sampled
+### otelcol_processor_atlassian_sampling_traces_not_sampled
 
 Number of traces dropped and not sampled
 
@@ -62,7 +62,7 @@ Number of traces dropped and not sampled
 | ---- | ----------- | ---------- | --------- |
 | {traces} | Sum | Int | true |
 
-### processor_atlassian_sampling_traces_sampled
+### otelcol_processor_atlassian_sampling_traces_sampled
 
 Number of traces sampled
 

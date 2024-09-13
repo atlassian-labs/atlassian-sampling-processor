@@ -7,7 +7,8 @@ import (
 )
 
 var (
-	Type = component.MustNewType("atlassian_sampling")
+	Type      = component.MustNewType("atlassian_sampling")
+	ScopeName = "bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor"
 )
 
 const (
