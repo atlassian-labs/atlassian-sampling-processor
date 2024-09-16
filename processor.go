@@ -60,8 +60,7 @@ type atlassianSamplingProcessor struct {
 var _ processor.Traces = (*atlassianSamplingProcessor)(nil)
 
 type nsdOutcome struct {
-	decisionTime   time.Time
-	decisionPolicy *policy
+	decisionTime time.Time
 }
 
 func newAtlassianSamplingProcessor(cCfg component.Config, set component.TelemetrySettings, next consumer.Traces) (*atlassianSamplingProcessor, error) {
@@ -236,7 +235,7 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 		}
 
 		// Evaluate the spans against the policies.
-		finalDecision, pol := asp.decider.MakeDecision(ctx, id, currentTrace, mergedMetadata)
+		finalDecision, _ := asp.decider.MakeDecision(ctx, id, currentTrace, mergedMetadata)
 
 		switch finalDecision {
 		case evaluators.Sampled:
@@ -251,8 +250,7 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 		case evaluators.NotSampled:
 			// Cache decision, delete any associated data
 			asp.nonSampledDecisionCache.Put(id, &nsdOutcome{
-				decisionTime:   time.Now(),
-				decisionPolicy: pol,
+				decisionTime: time.Now(),
 			})
 			asp.traceData.Delete(id)
 			asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
@@ -286,18 +284,7 @@ func (asp *atlassianSamplingProcessor) cachedDecision(
 		asp.releaseSampledTrace(ctx, td)
 		return true
 	}
-	if c, ok := asp.nonSampledDecisionCache.Get(id); ok {
-		// If the traceId was not sampled because of lonely root span policy
-		// we've encountered an exception (we've received a late arriving non-root span)
-
-		if c.decisionPolicy != nil && c.decisionPolicy.policyType == "root_spans" {
-			asp.telemetry.ProcessorAtlassianSamplingOverlyEagerLonelyRootSpanDecisions.Add(ctx, 1, metric.WithAttributes(
-				attribute.String("policy", c.decisionPolicy.name)))
-			asp.log.Warn("Late non-root span received",
-				zap.String("traceId", id.String()),
-				zap.Duration("delta", time.Since(c.decisionTime)),
-			)
-		}
+	if _, ok := asp.nonSampledDecisionCache.Get(id); ok {
 		return true
 	}
 	return false
@@ -356,8 +343,7 @@ func (asp *atlassianSamplingProcessor) newTraceEvictionCallback(cacheName string
 		if _, ok := asp.sampledDecisionCache.Get(idArr); !ok {
 			// Mark as not sampled
 			asp.nonSampledDecisionCache.Put(idArr, &nsdOutcome{
-				decisionTime:   time.Now(),
-				decisionPolicy: nil,
+				decisionTime: time.Now(),
 			})
 			asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
 			asp.telemetry.ProcessorAtlassianSamplingPolicyDecisions.Add(ctx, 1,

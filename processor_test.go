@@ -419,56 +419,6 @@ func TestShutdown_TimesOut(t *testing.T) {
 	require.Error(t, asp.Shutdown(cancelledCtx))
 }
 
-func TestLonelyRootSpanPolicy_LateSpanIsHandled(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	f := NewFactory()
-	cfg := (f.CreateDefaultConfig()).(*Config)
-	cfg.PrimaryCacheSize = 10
-	cfg.SecondaryCacheSize = 1
-	cfg.DecisionCacheCfg.SampledCacheSize = 10
-	cfg.DecisionCacheCfg.NonSampledCacheSize = 10
-
-	sink := &consumertest.TracesSink{}
-
-	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
-	require.NoError(t, err)
-	require.NotNil(t, asp)
-
-	p := &policy{
-		name:       "test_drop_lonely_root_span_policy",
-		policyType: "root_spans",
-	}
-	decider := &mockDecider{NextDecision: evaluators.NotSampled, NextDecisionPolicy: p}
-	asp.decider = decider
-
-	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
-
-	trace1 := ptrace.NewTraces()
-	span := trace1.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
-	span.SetTraceID(testTraceID)
-	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
-
-	// We send a second span belonging to the same trace (late arriving span)
-	trace2 := ptrace.NewTraces()
-	span2 := trace2.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
-	span2.SetTraceID(testTraceID)
-	require.NoError(t, asp.ConsumeTraces(ctx, trace2))
-	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces())) // blocks until previous consumption is completed
-
-	// The late arriving span should not be sampled should not change the decision
-	assert.Equal(t, 0, sink.SpanCount())
-
-	// NSD cache should have the trace ID and related metadata (policy, decision time)
-	nsdValue, ok := asp.nonSampledDecisionCache.Get(testTraceID)
-	assert.True(t, ok)
-
-	assert.Equal(t, PolicyType("root_spans"), nsdValue.decisionPolicy.policyType)
-	assert.Equal(t, "test_drop_lonely_root_span_policy", nsdValue.decisionPolicy.name)
-
-	require.NoError(t, asp.Shutdown(ctx))
-}
-
 func TestConsumeTraces_PrimaryCacheSizeConfigApplied(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
