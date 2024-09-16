@@ -17,14 +17,26 @@ as there is a good chance this component will be open sourced.
 
 ## Config 
 
-### `max_traces`
-
-The maximum amount of traces that are held in the internal LRU cache.
+### `primary_cache_size`
+The amount traces with non-low priority that are held in the primary internal LRU cache. 
 When this value reaches max, the least-recently-used trace is evicted and considered as "not sampled".
 
-`max_traces` is the most important value to tune in terms of memory usage. Keep an eye on the
-`processor_atlassian_sampling_trace_eviction_time` metric to tune how long you would like your traces to stay pending 
+The `primary_cache_size` value should be greater than 0, and should be set to a value that is appropriate for the trace volume.
+
+`primary_cache_size` is the most important value to tune in terms of memory usage. Keep an eye on the
+`processor_atlassian_sampling_trace_eviction_time` metric to tune how long you would like your traces to stay pending
 in memory before being considered not-sampled.
+
+### `secondary_cache_size`
+
+The amount of traces with low priority that are held in the secondary internal LRU cache.
+When this value reaches max, the least-recently-used trace is evicted and considered as "not sampled".
+
+The `secondary_cache_size` value should be greater than 0, and should be less than 50% of `primary_cache_size`.
+
+__Note: It will overwrite any entries of the same key in either the primary or secondary cache to prevent a key appearing in both primary and secondary. 
+If the caller wants to promote an existing key from secondary to primary, they can Put with non-low priority.__
+
 
 ### `decision_cache`
 

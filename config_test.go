@@ -36,8 +36,9 @@ func TestLoadConfig(t *testing.T) {
 	assert.Equal(t,
 		cfg,
 		&Config{
-			MaxTraces:        100,
-			DecisionCacheCfg: DecisionCacheCfg{SampledCacheSize: 1000, NonSampledCacheSize: 10000},
+			PrimaryCacheSize:   1000,
+			SecondaryCacheSize: 100,
+			DecisionCacheCfg:   DecisionCacheCfg{SampledCacheSize: 1000, NonSampledCacheSize: 10000},
 			PolicyConfig: []PolicyConfig{
 				{
 					SharedPolicyConfig: SharedPolicyConfig{
@@ -137,4 +138,25 @@ func TestLoadConfig(t *testing.T) {
 				},
 			},
 		})
+}
+
+func TestValidate(t *testing.T) {
+	testCases := []struct {
+		PrimaryCacheSize   int
+		SecondaryCacheSize int
+		hasError           bool
+	}{
+		{100, 10, false},
+		{0, 10, true},
+		{10, 0, true},
+		{100, 50, false},
+		{100, 55, true},
+	}
+	cfg := createDefaultConfig().(*Config)
+
+	for _, tc := range testCases {
+		cfg.PrimaryCacheSize = tc.PrimaryCacheSize
+		cfg.SecondaryCacheSize = tc.SecondaryCacheSize
+		assert.Equal(t, tc.hasError, cfg.Validate() != nil)
+	}
 }

@@ -71,7 +71,8 @@ func TestConsumeTraces_CachedDataIsSent(t *testing.T) {
 	ctx := context.Background()
 	f := NewFactory()
 	cfg := (f.CreateDefaultConfig()).(*Config)
-	cfg.MaxTraces = 100
+	cfg.PrimaryCacheSize = 100
+	cfg.SecondaryCacheSize = 10
 	cfg.DecisionCacheCfg.SampledCacheSize = 100
 	cfg.DecisionCacheCfg.NonSampledCacheSize = 100
 
@@ -211,7 +212,8 @@ func TestConsumeTraces_TraceDataPrioritised(t *testing.T) {
 	ctx := context.Background()
 	f := NewFactory()
 	cfg := (f.CreateDefaultConfig()).(*Config)
-	cfg.MaxTraces = 10 // 10 max traces -> 1 low priority cache size
+	cfg.PrimaryCacheSize = 10
+	cfg.SecondaryCacheSize = 1 // 1 secondary cache size -> 1 low priority cache size
 
 	sink := &consumertest.TracesSink{}
 
@@ -422,7 +424,8 @@ func TestLonelyRootSpanPolicy_LateSpanIsHandled(t *testing.T) {
 	ctx := context.Background()
 	f := NewFactory()
 	cfg := (f.CreateDefaultConfig()).(*Config)
-	cfg.MaxTraces = 10
+	cfg.PrimaryCacheSize = 10
+	cfg.SecondaryCacheSize = 1
 	cfg.DecisionCacheCfg.SampledCacheSize = 10
 	cfg.DecisionCacheCfg.NonSampledCacheSize = 10
 
@@ -462,6 +465,147 @@ func TestLonelyRootSpanPolicy_LateSpanIsHandled(t *testing.T) {
 
 	assert.Equal(t, PolicyType("root_spans"), nsdValue.decisionPolicy.policyType)
 	assert.Equal(t, "test_drop_lonely_root_span_policy", nsdValue.decisionPolicy.name)
+
+	require.NoError(t, asp.Shutdown(ctx))
+}
+
+func TestConsumeTraces_PrimaryCacheSizeConfigApplied(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := NewFactory()
+	cfg := (f.CreateDefaultConfig()).(*Config)
+	cfg.PrimaryCacheSize = 2 // 2 primary cache size -> 2 non-low priority cache size
+	cfg.SecondaryCacheSize = 1
+
+	sink := &consumertest.TracesSink{}
+
+	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
+	require.NoError(t, err)
+	require.NotNil(t, asp)
+
+	decider := &mockDecider{NextDecision: evaluators.Pending}
+	asp.decider = decider
+
+	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
+
+	// Consume first trace at pending priority
+	trace1 := ptrace.NewTraces()
+	span1 := trace1.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span1.SetTraceID(testTraceID)
+	span1.SetStartTimestamp(2)
+	span1.SetEndTimestamp(5)
+	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	assert.Equal(t, 0, sink.SpanCount())
+	td, ok := asp.traceData.Get(testTraceID)
+	assert.True(t, ok)
+	assert.Equal(t, priority.Unspecified, td.GetPriority())
+	assert.Equal(t, int32(1), td.Metadata.SpanCount)
+
+	// Consume second trace with new ID, also non-low priority.
+	trace2 := ptrace.NewTraces()
+	span2 := trace2.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span2.SetTraceID(testTraceID2)
+	span2.SetStartTimestamp(1)
+	span2.SetEndTimestamp(3)
+	require.NoError(t, asp.ConsumeTraces(ctx, trace2))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	assert.Equal(t, 0, sink.SpanCount())
+	_, ok = asp.traceData.Get(testTraceID)
+	assert.True(t, ok)
+	td, ok = asp.traceData.Get(testTraceID2)
+	assert.True(t, ok)
+	assert.Equal(t, priority.Unspecified, td.GetPriority())
+
+	// Third non-low priority decisions now should evict traceID1
+	trace3 := ptrace.NewTraces()
+	span3 := trace3.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span3.SetTraceID(testTraceID3)
+	span3.SetStartTimestamp(1)
+	span3.SetEndTimestamp(3)
+	require.NoError(t, asp.ConsumeTraces(ctx, trace3))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	_, ok = asp.traceData.Get(testTraceID)
+	assert.False(t, ok)
+
+	td, ok = asp.traceData.Get(testTraceID3)
+	assert.True(t, ok)
+	assert.Equal(t, priority.Unspecified, td.GetPriority())
+	assert.Equal(t, int32(1), td.Metadata.SpanCount)
+
+	require.NoError(t, asp.Shutdown(ctx))
+}
+
+func TestConsumeTraces_SecondaryCacheSizeConfigApplied(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := NewFactory()
+	cfg := (f.CreateDefaultConfig()).(*Config)
+	cfg.PrimaryCacheSize = 10
+	cfg.SecondaryCacheSize = 2 // 2 secondary cache size -> 2 low priority cache size
+
+	sink := &consumertest.TracesSink{}
+
+	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
+	require.NoError(t, err)
+	require.NotNil(t, asp)
+
+	decider := &mockDecider{NextDecision: evaluators.LowPriority}
+	asp.decider = decider
+
+	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
+
+	// Consume first trace at low priority
+	trace1 := ptrace.NewTraces()
+	span1 := trace1.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span1.SetTraceID(testTraceID)
+	span1.SetStartTimestamp(2)
+	span1.SetEndTimestamp(5)
+	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	assert.Equal(t, 0, sink.SpanCount())
+	td, ok := asp.traceData.Get(testTraceID)
+	assert.True(t, ok)
+	assert.Equal(t, priority.Low, td.GetPriority())
+	assert.Equal(t, int32(1), td.Metadata.SpanCount)
+
+	// Consume second trace with new ID, also low priority.
+	// Size of low priority cache should be 2, so this should not evict the existing low priority trace.
+	trace2 := ptrace.NewTraces()
+	span2 := trace2.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span2.SetTraceID(testTraceID2)
+	span2.SetStartTimestamp(1)
+	span2.SetEndTimestamp(3)
+	require.NoError(t, asp.ConsumeTraces(ctx, trace2))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	assert.Equal(t, 0, sink.SpanCount())
+	_, ok = asp.traceData.Get(testTraceID)
+	assert.True(t, ok)
+	td, ok = asp.traceData.Get(testTraceID2)
+	assert.True(t, ok)
+	assert.Equal(t, priority.Low, td.GetPriority())
+
+	// Third low priority decisions now should evict traceID1
+	trace3 := ptrace.NewTraces()
+	span3 := trace3.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span3.SetTraceID(testTraceID3)
+	span3.SetStartTimestamp(1)
+	span3.SetEndTimestamp(3)
+	require.NoError(t, asp.ConsumeTraces(ctx, trace3))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	_, ok = asp.traceData.Get(testTraceID)
+	assert.False(t, ok)
+
+	td, ok = asp.traceData.Get(testTraceID3)
+	assert.True(t, ok)
+	assert.Equal(t, priority.Low, td.GetPriority())
+	assert.Equal(t, int32(1), td.Metadata.SpanCount)
 
 	require.NoError(t, asp.Shutdown(ctx))
 }

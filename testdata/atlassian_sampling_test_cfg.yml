@@ -1,5 +1,6 @@
 atlassian_sampling:
-  max_traces: 100
+  primary_cache_size: 1000
+  secondary_cache_size: 100
   decision_cache:
     sampled_cache_size: 1000
     non_sampled_cache_size: 10000
