@@ -11,6 +11,7 @@ require (
 	go.opentelemetry.io/collector/confmap v1.15.0
 	go.opentelemetry.io/collector/consumer v0.109.0
 	go.opentelemetry.io/collector/consumer/consumertest v0.109.0
+	go.opentelemetry.io/collector/extension v0.109.0
 	go.opentelemetry.io/collector/pdata v1.15.0
 	go.opentelemetry.io/collector/processor v0.109.0
 	go.opentelemetry.io/otel v1.29.0

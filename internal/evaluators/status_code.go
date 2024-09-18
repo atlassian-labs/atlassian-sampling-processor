@@ -18,6 +18,7 @@ import (
 )
 
 type statusCodeEvaluator struct {
+	StartFunc
 	statusCodes []ptrace.StatusCode
 }
 

@@ -17,7 +17,9 @@ const (
 	threshAttrMaxLen             = 14                        // 14 hex characters -> 56 bits = 7 bytes
 )
 
-type thresholdEvaluator struct{}
+type thresholdEvaluator struct {
+	StartFunc
+}
 
 func NewThresholdEvaluator() PolicyEvaluator {
 	return &thresholdEvaluator{}

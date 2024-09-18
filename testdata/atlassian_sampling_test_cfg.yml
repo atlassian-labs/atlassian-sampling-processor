@@ -73,5 +73,14 @@ atlassian_sampling:
       {
         name: test-policy-8,
         type: threshold
+      },
+      {
+        name: test-policy-9,
+        type: remote_probabilistic,
+        remote_probabilistic: {
+          hash_salt: "test-salt",
+          rate_getter: test_rate_getter,
+          default_rate: 0.01,
+        }
       }
     ]

@@ -127,10 +127,15 @@ func (asp *atlassianSamplingProcessor) Capabilities() consumer.Capabilities {
 	return consumer.Capabilities{MutatesData: true}
 }
 
-func (asp *atlassianSamplingProcessor) Start(_ context.Context, _ component.Host) error {
+func (asp *atlassianSamplingProcessor) Start(ctx context.Context, host component.Host) error {
 	if running := asp.started.Swap(true); running {
 		return fmt.Errorf("component already started")
 	}
+
+	if err := asp.decider.Start(ctx, host); err != nil {
+		return fmt.Errorf("failed to start decider")
+	}
+
 	go asp.consumeChan()
 	return nil
 }

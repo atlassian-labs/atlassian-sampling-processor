@@ -201,6 +201,7 @@ func TestFindOnlySpan(t *testing.T) {
 }
 
 type staticTestEvaluator struct {
+	StartFunc
 	d Decision
 	e error
 }

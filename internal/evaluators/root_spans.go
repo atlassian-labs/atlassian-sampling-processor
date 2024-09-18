@@ -15,6 +15,7 @@ import (
 var emptySpanID = pcommon.NewSpanIDEmpty()
 
 type rootSpansEvaluator struct {
+	StartFunc
 	subPolicy PolicyEvaluator
 }
 

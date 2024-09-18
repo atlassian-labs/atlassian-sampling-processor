@@ -22,6 +22,7 @@ const (
 )
 
 type probabilisticSampler struct {
+	StartFunc
 	threshold uint64
 	hashSalt  string
 }

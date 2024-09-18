@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/consumer/consumertest"
 	"go.opentelemetry.io/collector/pdata/pcommon"
@@ -41,6 +42,10 @@ var _ deciderI = (*mockDecider)(nil)
 
 func (m *mockDecider) MakeDecision(ctx context.Context, id pcommon.TraceID, currentTrace ptrace.Traces, mergedMetadata *tracedata.Metadata) (evaluators.Decision, *policy) {
 	return m.NextDecision, m.NextDecisionPolicy
+}
+
+func (m *mockDecider) Start(ctx context.Context, host component.Host) error {
+	return nil
 }
 
 func TestConsumeTraces_Basic(t *testing.T) {

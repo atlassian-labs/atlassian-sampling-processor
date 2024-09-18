@@ -41,4 +41,6 @@ func TestPolicyCreationFromConfig(t *testing.T) {
 	assert.Equal(t, OTTLCondition, policies[6].policyType)
 	assert.Equal(t, "test-policy-8", policies[7].name)
 	assert.Equal(t, Threshold, policies[7].policyType)
+	assert.Equal(t, "test-policy-9", policies[8].name)
+	assert.Equal(t, RemoteProbabilistic, policies[8].policyType)
 }

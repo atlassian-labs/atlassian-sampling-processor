@@ -75,7 +75,9 @@ Policies include a `name`, `type`, and then further configuration depending on w
 
 Current supported policy types are: 
 - `span_count` - samples the trace if it meets a minimum amount of spans. 
-- `probabilistic` - evaluates the hash of the trace ID to a configured percentage. 
+- `probabilistic` - evaluates the hash of the trace ID to a configured percentage.
+- `remote_probabilistic` - fetches sampling rates using the specified rate getter at runtime and samples traces
+  based on the fetched sampling rate. 
 - `and` - combines any number of sampling policies together.
 - `root_spans` - specifies a sub-policy to only operate on lone-root-spans, but eagerly converts the sub-policy "pending"
   decisions into "not sampled" decisions. A span considered to be "lone" if there is no other spans present for the same

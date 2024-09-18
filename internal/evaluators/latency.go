@@ -16,6 +16,7 @@ import (
 )
 
 type latency struct {
+	StartFunc
 	thresholdMs int64
 }
 

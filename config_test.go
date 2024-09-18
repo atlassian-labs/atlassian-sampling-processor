@@ -136,6 +136,17 @@ func TestLoadConfig(t *testing.T) {
 						Type: Threshold,
 					},
 				},
+				{
+					SharedPolicyConfig: SharedPolicyConfig{
+						Name: "test-policy-9",
+						Type: RemoteProbabilistic,
+						RemoteProbabilisticConfig: RemoteProbabilisticConfig{
+							HashSalt:      "test-salt",
+							RateGetterExt: component.MustNewID("test_rate_getter"),
+							DefaultRate:   0.01,
+						},
+					},
+				},
 			},
 		})
 }

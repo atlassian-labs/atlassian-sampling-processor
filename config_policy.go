@@ -6,7 +6,11 @@
 
 package atlassiansamplingprocessor // import "bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor"
 
-import "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl"
+import (
+	"go.opentelemetry.io/collector/component"
+
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl"
+)
 
 // PolicyConfig holds the common configuration to all policies.
 type PolicyConfig struct {
@@ -35,6 +39,8 @@ type SharedPolicyConfig struct {
 	StatusCodeConfig `mapstructure:"status_code"`
 	// Configs for OTTL condition filter sampling policy evaluator
 	OTTLConditionConfig `mapstructure:"ottl_condition"`
+	// Configs for remote probabilistic sampling policy evaluator
+	RemoteProbabilisticConfig `mapstructure:"remote_probabilistic"`
 }
 
 // AndSubPolicyConfig holds the common configuration to all policies under and policy.
@@ -91,6 +97,21 @@ type OTTLConditionConfig struct {
 	SpanEventConditions []string       `mapstructure:"spanevent"`
 }
 
+// RemoteProbabilisticConfig holds the configurable settings to create a remote probabilistic
+// sampling policy evaluator.
+type RemoteProbabilisticConfig struct {
+	// HashSalt allows one to configure the hashing salts. This is important in scenarios where multiple layers of collectors
+	// have different sampling rates: if they use the same salt all passing one layer may pass the other even if they have
+	// different sampling rates, configuring different salts avoids that.
+	HashSalt string `mapstructure:"hash_salt"`
+	// DefaultRate is the default rate at which traces are going to be sampled if there is an error from the specified rate getter.
+	// Defaults to zero, i.e.: no sample. Values greater or equal 100 are treated as "sample all traces".
+	DefaultRate float64 `mapstructure:"default_rate"`
+	// RateGetterExt is the component id of the rate getter extension to use to fetch the sampling rate at runtime.
+	// The extension must implement the RateGetter interface.
+	RateGetterExt component.ID `mapstructure:"rate_getter"`
+}
+
 // PolicyType indicates the type of sampling policy.
 type PolicyType string
 
@@ -113,4 +134,6 @@ const (
 	// Threshold retrieves the threshold from sampling.tail.threshold attribute.
 	// It compares the threshold to the trace ID.
 	Threshold PolicyType = "threshold"
+	// RemoteProbabilistic fetches the sampling rate and samples traces based on the returned rate at runtime.
+	RemoteProbabilistic PolicyType = "remote_probabilistic"
 )

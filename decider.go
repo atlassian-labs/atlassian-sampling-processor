@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/otel/attribute"
@@ -16,6 +17,7 @@ import (
 )
 
 type deciderI interface {
+	Start(ctx context.Context, host component.Host) error
 	MakeDecision(ctx context.Context, id pcommon.TraceID, currentTrace ptrace.Traces, mergedMetadata *tracedata.Metadata) (evaluators.Decision, *policy)
 }
 
@@ -54,6 +56,16 @@ func (d *decider) MakeDecision(ctx context.Context, id pcommon.TraceID, currentT
 	return evaluators.Pending, nil
 }
 
+func (d *decider) Start(ctx context.Context, host component.Host) error {
+	for _, p := range d.policies {
+		err := p.evaluator.Start(ctx, host)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func getPolicyEvaluator(cfg *PolicyConfig) (evaluators.PolicyEvaluator, error) {
 	switch cfg.Type {
 	case And:
@@ -89,6 +101,9 @@ func getSharedPolicyEvaluator(cfg *SharedPolicyConfig) (evaluators.PolicyEvaluat
 		return evaluators.NewOTTLConditionEvaluator(ottlcCfg.SpanConditions, ottlcCfg.SpanEventConditions, ottlcCfg.ErrorMode)
 	case Threshold:
 		return evaluators.NewThresholdEvaluator(), nil
+	case RemoteProbabilistic:
+		rpCfg := cfg.RemoteProbabilisticConfig
+		return evaluators.NewRemoteProbabilisticSampler(rpCfg.HashSalt, rpCfg.DefaultRate, rpCfg.RateGetterExt), nil
 	default:
 		return nil, fmt.Errorf("unknown sampling policy type %s", cfg.Type)
 	}

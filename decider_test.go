@@ -172,6 +172,7 @@ func alwaysError() *policy {
 }
 
 type staticTestEvaluator struct {
+	evaluators.StartFunc
 	d evaluators.Decision
 	e error
 }

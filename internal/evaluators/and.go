@@ -16,6 +16,7 @@ import (
 )
 
 type andEvaluator struct {
+	StartFunc
 	// the subPolicy evaluators
 	subpolicies []PolicyEvaluator
 }

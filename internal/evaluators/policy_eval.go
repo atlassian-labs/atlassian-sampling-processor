@@ -9,6 +9,7 @@ package evaluators // import "bitbucket.org/atlassian/observability-sidecar/pkg/
 import (
 	"context"
 
+	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 
@@ -50,8 +51,22 @@ func (d Decision) String() string {
 // PolicyEvaluator implements a tail-based sampling policy evaluator,
 // which makes a sampling decision for a given trace when requested.
 type PolicyEvaluator interface {
+	// Start is called when the component is first started.
+	// It allows the evaluator to perform any configuration that requires the host, e.g. accessing extensions.
+	Start(ctx context.Context, host component.Host) error
+
 	// Evaluate looks at the trace data and merged metadata, and returns a corresponding SamplingDecision.
 	// The cached trace data is not passed on to avoid evaluators going through the old spans.
 	// The metadata should contain all relevant information about the old spans needed to make a decision.
 	Evaluate(ctx context.Context, traceID pcommon.TraceID, currentTrace ptrace.Traces, mergedMetadata *tracedata.Metadata) (Decision, error)
+}
+
+// StartFunc specifies the function invoked when the evaluator is being started.
+type StartFunc func(context.Context, component.Host) error
+
+func (f StartFunc) Start(ctx context.Context, host component.Host) error {
+	if f == nil {
+		return nil
+	}
+	return f(ctx, host)
 }

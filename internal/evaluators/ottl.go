@@ -24,6 +24,7 @@ import (
 )
 
 type ottlConditionEvaluator struct {
+	StartFunc
 	sampleSpanExpr      BoolExpr[ottlspan.TransformContext]
 	sampleSpanEventExpr BoolExpr[ottlspanevent.TransformContext]
 	errorMode           ottl.ErrorMode

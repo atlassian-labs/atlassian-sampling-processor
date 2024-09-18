@@ -16,6 +16,7 @@ import (
 )
 
 type spanCount struct {
+	StartFunc
 	minSpans int32
 }
 
