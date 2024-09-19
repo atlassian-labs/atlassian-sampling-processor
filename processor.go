@@ -337,9 +337,7 @@ func (asp *atlassianSamplingProcessor) newTraceEvictionCallback(cacheName string
 		asp.log.Debug("evicting trace from cache",
 			zap.Uint64("traceID", id),
 			zap.String("cache", cacheName))
-		asp.telemetry.ProcessorAtlassianSamplingTraceEvictionTime.
-			Record(ctx, time.Since(td.Metadata.ArrivalTime).Seconds(),
-				metric.WithAttributes(attribute.String("cache", cacheName)))
+
 		// Convert back to [16]byte to query. We only need the right 8-bytes from the uint64,
 		// since the cache only uses the right 8 bytes.
 		idArr := pcommon.NewTraceIDEmpty()
@@ -357,6 +355,12 @@ func (asp *atlassianSamplingProcessor) newTraceEvictionCallback(cacheName string
 					attribute.String("decision", evaluators.NotSampled.String()),
 					attribute.String("cache", cacheName),
 				))
+
+			// Only record eviction time when it was a trace that was not sampled, to avoid
+			// metrics being polluted with explicit cache deletions from traces being sampled and exported.
+			asp.telemetry.ProcessorAtlassianSamplingTraceEvictionTime.
+				Record(ctx, time.Since(td.Metadata.ArrivalTime).Seconds(),
+					metric.WithAttributes(attribute.String("cache", cacheName)))
 		}
 	}
 }
