@@ -35,7 +35,7 @@ func TestMerge(t *testing.T) {
 
 	td1 := NewTraceData(time.Now(), trace1, priority.Low)
 	td2 := NewTraceData(time.Now(), trace2, priority.Unspecified)
-	td1.MergeWith(td2)
+	td1.AbsorbTraceData(td2)
 	m1 := td1.Metadata
 
 	assert.Equal(t, int32(2), m1.SpanCount)
@@ -59,7 +59,7 @@ func TestMerge_OtherIsEarlier(t *testing.T) {
 
 	td1 := NewTraceData(time.UnixMilli(2), trace1, priority.Unspecified)
 	td2 := NewTraceData(time.UnixMilli(1), trace2, priority.Unspecified)
-	td1.MergeWith(td2)
+	td1.AbsorbTraceData(td2)
 	m1 := td1.Metadata
 
 	assert.Equal(t, int32(2), m1.SpanCount)

@@ -13,8 +13,8 @@ import (
 type TraceData struct {
 	Metadata *Metadata
 
-	// receivedBatches stores all the batches received for the trace.
-	receivedBatches ptrace.Traces
+	// traces stores all trace data received for the trace.
+	traces ptrace.Traces
 }
 
 var _ priority.Getter = (*TraceData)(nil)
@@ -48,20 +48,21 @@ func NewTraceData(arrival time.Time, traces ptrace.Traces, p priority.Priority) 
 	}
 
 	return &TraceData{
-		Metadata:        metadata,
-		receivedBatches: traces,
+		Metadata: metadata,
+		traces:   traces,
 	}
 }
 
-// MergeWith merges the data from the other TraceData into this TraceData
-// It modifies the current TraceData instance(i.e. `td`) but does not modify the other TradeData provided(i.e. `other`)
-func (td *TraceData) MergeWith(other *TraceData) {
+// AbsorbTraceData merges the data from the other TraceData into this TraceData.
+// It modifies both the current TraceData instance (td) and the one passed in (other).
+// other MUST NOT be used after calling this function, as it's trace data is moved into td.
+func (td *TraceData) AbsorbTraceData(other *TraceData) {
 	td.Metadata.MergeWith(other.Metadata)
 
-	for i := 0; i < other.receivedBatches.ResourceSpans().Len(); i++ {
-		rs := other.receivedBatches.ResourceSpans().At(i)
-		dest := td.receivedBatches.ResourceSpans().AppendEmpty()
-		rs.CopyTo(dest)
+	for i := 0; i < other.traces.ResourceSpans().Len(); i++ {
+		rs := other.traces.ResourceSpans().At(i)
+		dest := td.traces.ResourceSpans().AppendEmpty()
+		rs.MoveTo(dest)
 	}
 }
 
@@ -71,7 +72,7 @@ func (td *TraceData) GetPriority() priority.Priority {
 }
 
 // GetTraces returns all batches received for the trace
-// The traces returned should not be modified by the caller, MergeWith should be used to add data to a TraceData instead.
+// The traces returned should not be modified by the caller, AbsorbTraceData should be used to add data to a TraceData instead.
 func (td *TraceData) GetTraces() ptrace.Traces {
-	return td.receivedBatches
+	return td.traces
 }

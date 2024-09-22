@@ -267,12 +267,11 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 				td.Metadata.Priority = priority.Low
 			}
 
-			mergedData := td
-			if cachedData, ok := asp.traceData.Get(id); ok {
-				cachedData.MergeWith(td) // chooses higher priority in merge
-				mergedData = cachedData
+			if cachedTd, ok := asp.traceData.Get(id); ok {
+				cachedTd.AbsorbTraceData(td) // chooses higher priority in merge
+				td = cachedTd                // td is now the initial, incoming td + the cached td
 			}
-			asp.traceData.Put(id, mergedData)
+			asp.traceData.Put(id, td)
 		}
 	}
 }
