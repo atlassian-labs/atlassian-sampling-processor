@@ -28,6 +28,7 @@ var (
 type lruCache[V any] struct {
 	cache     *lru.Cache[uint64, V]
 	telemetry *metadata.TelemetryBuilder
+	size      int
 }
 
 var _ Cache[any] = (*lruCache[any])(nil)
@@ -40,7 +41,7 @@ func NewLRUCache[V any](size int, onEvicted func(uint64, V), telemetry *metadata
 	if err != nil {
 		return nil, err
 	}
-	return &lruCache[V]{cache: c, telemetry: telemetry}, nil
+	return &lruCache[V]{cache: c, size: size, telemetry: telemetry}, nil
 }
 
 func (c *lruCache[V]) Get(id pcommon.TraceID) (V, bool) {
@@ -65,6 +66,18 @@ func (c *lruCache[V]) Delete(id pcommon.TraceID) {
 
 func (c *lruCache[V]) Values() []V {
 	return c.cache.Values()
+}
+
+// Size returns the current capacity of the LRU cache
+func (c *lruCache[V]) Size() int {
+	return c.size
+}
+
+// Resize sets a new size for the cache. If the cache size is being reduced,
+// the oldest entries will be deleted.
+func (c *lruCache[V]) Resize(size int) {
+	c.cache.Resize(size)
+	c.size = size
 }
 
 func rightHalfTraceID(id pcommon.TraceID) uint64 {

@@ -66,4 +66,10 @@ telemetry:
       sum:
         value_type: int
         monotonic: true
+    processor_atlassian_sampling_primary_cache_size:
+      enabled: true
+      description: Size on the primary cache
+      unit: "{traces}"
+      gauge:
+        value_type: int
 

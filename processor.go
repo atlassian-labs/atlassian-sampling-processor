@@ -20,12 +20,14 @@ import (
 
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/cache"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/evaluators"
+	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/memory"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/metadata"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/priority"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 )
 
 const flushCountKey = "atlassiansampling.flushes"
+const memTickerInterval = 10 * time.Second
 
 var (
 	sampledAttr    = metric.WithAttributes(attribute.String("decision", "sampled"))
@@ -49,6 +51,11 @@ type atlassianSamplingProcessor struct {
 	nonSampledDecisionCache cache.Cache[*nsdOutcome]
 	// incomingTraces is where the traces are put when they first arrive to the component
 	incomingTraces chan ptrace.Traces
+	// memRegulator can adjust cache sizes to target a given heap usage.
+	// May be nil, in which case the cache sizes will not be adjusted.
+	memRegulator *memory.Regulator
+	// memTicker controls how often the memRegulator is called
+	memTicker *time.Ticker
 	// shutdownStart is a chan used to signal to the async goroutine to start shutdown.
 	// The deadline time is passed to the chan, so the async goroutine knows when to time out.
 	shutdownStart   chan time.Time
@@ -113,6 +120,20 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 		return nil, err
 	}
 
+	asp.memTicker = time.NewTicker(memTickerInterval)
+	if cfg.TargetHeapBytes > 0 {
+		memRegulator, rErr := memory.NewRegulator(
+			cfg.PrimaryCacheSize/2,
+			cfg.PrimaryCacheSize,
+			cfg.TargetHeapBytes,
+			memory.GetHeapUsage,
+			primaryCache)
+		if rErr != nil {
+			return nil, rErr
+		}
+		asp.memRegulator = memRegulator
+	}
+
 	pols, err := newPolicies(cfg.PolicyConfig)
 	if err != nil {
 		return nil, err
@@ -151,6 +172,8 @@ func (asp *atlassianSamplingProcessor) Shutdown(parentCtx context.Context) error
 	// Need to close chan because if parentCtx is cancelled already, the below select/case never sends the shutdown
 	// signal, resulting in the consumeChan() goroutine to block waiting. Closing the channel forces this to release.
 	defer close(asp.shutdownStart)
+
+	asp.memTicker.Stop()
 
 	select {
 	case asp.shutdownStart <- deadline:
@@ -197,7 +220,12 @@ func (asp *atlassianSamplingProcessor) consumeChan() {
 			for i := 0; i < resourceSpans.Len(); i++ {
 				asp.processTraces(ctx, resourceSpans.At(i))
 			}
-
+		case <-asp.memTicker.C:
+			// If ticker signals, call the memory regulator
+			if asp.memRegulator != nil {
+				size := asp.memRegulator.RegulateCacheSize()
+				asp.telemetry.ProcessorAtlassianSamplingPrimaryCacheSize.Record(ctx, int64(size))
+			}
 		// If shutdown is signaled, process any pending traces and return
 		case deadline := <-asp.shutdownStart:
 			shutdownCtx, cancel := context.WithDeadline(ctx, deadline)

@@ -20,4 +20,7 @@ func TestNopCache(t *testing.T) {
 	assert.False(t, ok)
 	c.Delete(id)
 	assert.Equal(t, []bool{}, c.Values())
+	assert.Equal(t, 0, c.Size())
+	c.Resize(100)
+	assert.Equal(t, 0, c.Size())
 }

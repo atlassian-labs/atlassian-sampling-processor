@@ -29,6 +29,8 @@ func TestTieredCache(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, c)
 
+	assert.Equal(t, 20, c.Size())
+
 	id0 := traceIDFromHex(t, "12341234123412341234123412341234")
 	c.Put(id0, tpgLow)
 	v, ok := c.Get(id0)
@@ -84,4 +86,13 @@ func TestConstruction_Errors(t *testing.T) {
 	assert.Error(t, err)
 	_, err = NewTieredCache[*testPriorityGetter](nil, c)
 	assert.Error(t, err)
+}
+
+func TestResize_DoesNothing(t *testing.T) {
+	primary, _ := NewLRUCache[*testPriorityGetter](10, nil, testTelem)
+	secondary, _ := NewLRUCache[*testPriorityGetter](10, nil, testTelem)
+	c, _ := NewTieredCache[*testPriorityGetter](primary, secondary)
+	assert.Equal(t, 20, c.Size())
+	c.Resize(100)
+	assert.Equal(t, 20, c.Size())
 }

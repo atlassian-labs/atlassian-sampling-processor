@@ -29,3 +29,9 @@ func (n *nopDecisionCache[V]) Delete(_ pcommon.TraceID) {}
 func (n *nopDecisionCache[V]) Values() []V {
 	return make([]V, 0)
 }
+
+func (n *nopDecisionCache[V]) Size() int {
+	return 0
+}
+
+func (n *nopDecisionCache[V]) Resize(_ int) {}

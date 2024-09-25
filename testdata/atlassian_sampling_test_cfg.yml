@@ -1,6 +1,7 @@
 atlassian_sampling:
   primary_cache_size: 1000
   secondary_cache_size: 100
+  target_heap_bytes: 100_000_000 # 100 MB
   decision_cache:
     sampled_cache_size: 1000
     non_sampled_cache_size: 10000

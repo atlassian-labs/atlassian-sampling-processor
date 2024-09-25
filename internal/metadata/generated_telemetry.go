@@ -33,6 +33,7 @@ type TelemetryBuilder struct {
 	ProcessorAtlassianSamplingDecisionEvictionTime               metric.Float64Gauge
 	ProcessorAtlassianSamplingOverlyEagerLonelyRootSpanDecisions metric.Int64Counter
 	ProcessorAtlassianSamplingPolicyDecisions                    metric.Int64Counter
+	ProcessorAtlassianSamplingPrimaryCacheSize                   metric.Int64Gauge
 	ProcessorAtlassianSamplingTraceEvictionTime                  metric.Float64Gauge
 	ProcessorAtlassianSamplingTracesNotSampled                   metric.Int64Counter
 	ProcessorAtlassianSamplingTracesSampled                      metric.Int64Counter
@@ -79,6 +80,12 @@ func NewTelemetryBuilder(settings component.TelemetrySettings, options ...teleme
 		"otelcol_processor_atlassian_sampling_policy_decisions",
 		metric.WithDescription("Sampling decisions made specifying policy and decision."),
 		metric.WithUnit("{decisions}"),
+	)
+	errs = errors.Join(errs, err)
+	builder.ProcessorAtlassianSamplingPrimaryCacheSize, err = builder.meters[configtelemetry.LevelBasic].Int64Gauge(
+		"otelcol_processor_atlassian_sampling_primary_cache_size",
+		metric.WithDescription("Size on the primary cache"),
+		metric.WithUnit("{traces}"),
 	)
 	errs = errors.Join(errs, err)
 	builder.ProcessorAtlassianSamplingTraceEvictionTime, err = builder.meters[configtelemetry.LevelBasic].Float64Gauge(

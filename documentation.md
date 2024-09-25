@@ -46,6 +46,14 @@ Sampling decisions made specifying policy and decision.
 | ---- | ----------- | ---------- | --------- |
 | {decisions} | Sum | Int | true |
 
+### otelcol_processor_atlassian_sampling_primary_cache_size
+
+Size on the primary cache
+
+| Unit | Metric Type | Value Type |
+| ---- | ----------- | ---------- |
+| {traces} | Gauge | Int |
+
 ### otelcol_processor_atlassian_sampling_trace_eviction_time
 
 Time that a non-sampled trace was kept in memory from arrival to being evicted
