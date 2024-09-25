@@ -14,6 +14,7 @@ type Config struct {
 
 	// TargetHeapBytes, is the optional target heap size runtime.MemStats.HeapAlloc.
 	// If set, the processor may adjust cache sizes dynamically in order to keep within the target.
+	// A good starting point to set this is about 75% of overall memory resource allocation.
 	TargetHeapBytes uint64 `mapstructure:"target_heap_bytes"`
 
 	// PrimaryCacheSize sets the initial and maximum size of the primary cache that holds non-low priority traces.
