@@ -68,8 +68,11 @@ type ProbabilisticConfig struct {
 // SpanCountConfig holds the configurable settings to create a Span Count filter sampling
 // policy evaluator
 type SpanCountConfig struct {
-	// Minimum number of spans in a Trace
+	// MinSpans is the minimum number of spans in a Trace for it to be sampled
 	MinSpans int32 `mapstructure:"min_spans"`
+	// LogSampled indicates whether to emit a log when a trace is sampled.
+	// It will log trace ID, services in trace, and span count.
+	LogSampled bool `mapstructure:"log_sampled"`
 }
 
 type RootSpansConfig struct {

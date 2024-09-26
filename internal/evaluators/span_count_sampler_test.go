@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 
@@ -19,7 +20,7 @@ import (
 
 func TestEvaluate(t *testing.T) {
 	minSpans := int32(3)
-
+	set := componenttest.NewNopTelemetrySettings()
 	traceID := pcommon.TraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
 
 	cases := []struct {
@@ -48,10 +49,11 @@ func TestEvaluate(t *testing.T) {
 		},
 	}
 
-	evaluator := NewSpanCount(minSpans)
+	evaluator := NewSpanCount(minSpans, set.Logger)
 
 	for _, c := range cases {
 		t.Run(c.Desc, func(t *testing.T) {
+			t.Parallel()
 			decision, err := evaluator.Evaluate(context.Background(), traceID, newTraceWithMultipleSpans(c.NumberSpans), newMergedMetadata(c.NumberSpans, c.NumberCachedSpan))
 			assert.NoError(t, err)
 			assert.Equal(t, decision, c.Decision)

@@ -134,7 +134,7 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 		asp.memRegulator = memRegulator
 	}
 
-	pols, err := newPolicies(cfg.PolicyConfig)
+	pols, err := newPolicies(cfg.PolicyConfig, set)
 	if err != nil {
 		return nil, err
 	}

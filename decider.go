@@ -66,30 +66,34 @@ func (d *decider) Start(ctx context.Context, host component.Host) error {
 	return nil
 }
 
-func getPolicyEvaluator(cfg *PolicyConfig) (evaluators.PolicyEvaluator, error) {
+func getPolicyEvaluator(cfg *PolicyConfig, set component.TelemetrySettings) (evaluators.PolicyEvaluator, error) {
 	switch cfg.Type {
 	case And:
-		return getNewAndPolicy(&cfg.AndConfig)
+		return getNewAndPolicy(&cfg.AndConfig, set)
 	case RootSpans:
-		return getNewRootSpansPolicy(&cfg.RootSpansConfig)
+		return getNewRootSpansPolicy(&cfg.RootSpansConfig, set)
 	default:
-		return getSharedPolicyEvaluator(&cfg.SharedPolicyConfig)
+		return getSharedPolicyEvaluator(&cfg.SharedPolicyConfig, set)
 	}
 }
 
 // Return instance of and sub-policy
-func getAndSubPolicyEvaluator(cfg *AndSubPolicyConfig) (evaluators.PolicyEvaluator, error) {
-	return getSharedPolicyEvaluator(&cfg.SharedPolicyConfig)
+func getAndSubPolicyEvaluator(cfg *AndSubPolicyConfig, set component.TelemetrySettings) (evaluators.PolicyEvaluator, error) {
+	return getSharedPolicyEvaluator(&cfg.SharedPolicyConfig, set)
 }
 
-func getSharedPolicyEvaluator(cfg *SharedPolicyConfig) (evaluators.PolicyEvaluator, error) {
+func getSharedPolicyEvaluator(cfg *SharedPolicyConfig, set component.TelemetrySettings) (evaluators.PolicyEvaluator, error) {
 	switch cfg.Type {
 	case Probabilistic:
 		pCfg := cfg.ProbabilisticConfig
 		return evaluators.NewProbabilisticSampler(pCfg.HashSalt, pCfg.SamplingPercentage), nil
 	case SpanCount:
 		spCfg := cfg.SpanCountConfig
-		return evaluators.NewSpanCount(spCfg.MinSpans), nil
+		var log *zap.Logger
+		if spCfg.LogSampled {
+			log = set.Logger
+		}
+		return evaluators.NewSpanCount(spCfg.MinSpans, log), nil
 	case Latency:
 		lCfg := cfg.LatencyConfig
 		return evaluators.NewLatency(lCfg.ThresholdMs), nil
@@ -109,11 +113,11 @@ func getSharedPolicyEvaluator(cfg *SharedPolicyConfig) (evaluators.PolicyEvaluat
 	}
 }
 
-func getNewAndPolicy(config *AndConfig) (evaluators.PolicyEvaluator, error) {
+func getNewAndPolicy(config *AndConfig, set component.TelemetrySettings) (evaluators.PolicyEvaluator, error) {
 	subPolicyEvaluators := make([]evaluators.PolicyEvaluator, len(config.SubPolicyCfg))
 	for i := range config.SubPolicyCfg {
 		policyCfg := &config.SubPolicyCfg[i]
-		policy, err := getAndSubPolicyEvaluator(policyCfg)
+		policy, err := getAndSubPolicyEvaluator(policyCfg, set)
 		if err != nil {
 			return nil, err
 		}
@@ -122,8 +126,8 @@ func getNewAndPolicy(config *AndConfig) (evaluators.PolicyEvaluator, error) {
 	return evaluators.NewAndEvaluator(subPolicyEvaluators), nil
 }
 
-func getNewRootSpansPolicy(cfg *RootSpansConfig) (evaluators.PolicyEvaluator, error) {
-	subPolicy, err := getSharedPolicyEvaluator(&cfg.SubPolicyCfg)
+func getNewRootSpansPolicy(cfg *RootSpansConfig, set component.TelemetrySettings) (evaluators.PolicyEvaluator, error) {
+	subPolicy, err := getSharedPolicyEvaluator(&cfg.SubPolicyCfg, set)
 	if err != nil {
 		return nil, err
 	}

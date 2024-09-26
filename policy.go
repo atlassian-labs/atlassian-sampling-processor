@@ -3,6 +3,7 @@ package atlassiansamplingprocessor // import "bitbucket.org/atlassian/observabil
 import (
 	"fmt"
 
+	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
@@ -21,7 +22,7 @@ type policy struct {
 	attribute metric.MeasurementOption
 }
 
-func newPolicies(cfg []PolicyConfig) ([]*policy, error) {
+func newPolicies(cfg []PolicyConfig, set component.TelemetrySettings) ([]*policy, error) {
 	policyNames := map[string]bool{}
 	pols := make([]*policy, len(cfg))
 	for i := range cfg {
@@ -32,7 +33,7 @@ func newPolicies(cfg []PolicyConfig) ([]*policy, error) {
 		}
 		policyNames[policyCfg.Name] = true
 
-		eval, err := getPolicyEvaluator(policyCfg)
+		eval, err := getPolicyEvaluator(policyCfg, set)
 		if err != nil {
 			return nil, err
 		}

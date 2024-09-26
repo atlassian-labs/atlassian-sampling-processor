@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/confmap/confmaptest"
 
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/metadata"
@@ -14,6 +15,7 @@ import (
 
 func TestPolicyCreationFromConfig(t *testing.T) {
 	t.Parallel()
+	set := componenttest.NewNopTelemetrySettings()
 	cm, err := confmaptest.LoadConf(filepath.Join("testdata", "atlassian_sampling_test_cfg.yml"))
 	require.NoError(t, err)
 	factory := NewFactory()
@@ -22,7 +24,7 @@ func TestPolicyCreationFromConfig(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, sub.Unmarshal(cfg))
 
-	policies, err := newPolicies(cfg.(*Config).PolicyConfig)
+	policies, err := newPolicies(cfg.(*Config).PolicyConfig, set)
 	require.NoError(t, err)
 
 	assert.Equal(t, "test-policy-1", policies[0].name)
