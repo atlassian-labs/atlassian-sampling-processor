@@ -93,7 +93,7 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 
 	primaryCache, err := cache.NewLRUCache[*tracedata.TraceData](
 		cfg.PrimaryCacheSize,
-		asp.newTraceEvictionCallback("primary"),
+		asp.primaryEvictionCallback,
 		telemetry)
 	if err != nil {
 		return nil, err
@@ -101,7 +101,7 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 
 	secondaryCache, err := cache.NewLRUCache[*tracedata.TraceData](
 		cfg.SecondaryCacheSize,
-		asp.newTraceEvictionCallback("secondary"),
+		asp.secondaryEvictionCallback,
 		telemetry)
 	if err != nil {
 		return nil, err
@@ -358,37 +358,53 @@ func (asp *atlassianSamplingProcessor) flushAll(ctx context.Context) error {
 	return err
 }
 
-func (asp *atlassianSamplingProcessor) newTraceEvictionCallback(cacheName string) func(id uint64, td *tracedata.TraceData) {
-	return func(id uint64, td *tracedata.TraceData) {
-		ctx := context.Background()
-		asp.log.Debug("evicting trace from cache",
-			zap.Uint64("traceID", id),
-			zap.String("cache", cacheName))
+func (asp *atlassianSamplingProcessor) primaryEvictionCallback(id uint64, td *tracedata.TraceData) {
+	cacheName := "primary"
+	asp.cacheEvictionCallback(cacheName, id, td)
+}
 
-		// Convert back to [16]byte to query. We only need the right 8-bytes from the uint64,
-		// since the cache only uses the right 8 bytes.
-		idArr := pcommon.NewTraceIDEmpty()
-		binary.LittleEndian.PutUint64(idArr[8:16], id)
-		// Double check that we didn't actually sample this trace
-		if _, ok := asp.sampledDecisionCache.Get(idArr); !ok {
-			// Mark as not sampled
-			asp.nonSampledDecisionCache.Put(idArr, &nsdOutcome{
-				decisionTime: time.Now(),
-			})
-			asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
-			asp.telemetry.ProcessorAtlassianSamplingPolicyDecisions.Add(ctx, 1,
-				metric.WithAttributes(
-					attribute.String("policy", "evicted"),
-					attribute.String("decision", evaluators.NotSampled.String()),
-					attribute.String("cache", cacheName),
-				))
+func (asp *atlassianSamplingProcessor) secondaryEvictionCallback(id uint64, td *tracedata.TraceData) {
+	cacheName := "secondary"
 
-			// Only record eviction time when it was a trace that was not sampled, to avoid
-			// metrics being polluted with explicit cache deletions from traces being sampled and exported.
-			asp.telemetry.ProcessorAtlassianSamplingTraceEvictionTime.
-				Record(ctx, time.Since(td.Metadata.ArrivalTime).Seconds(),
-					metric.WithAttributes(attribute.String("cache", cacheName)))
-		}
+	// This trace is only being truly evicted if the priority is still low.
+	// If it's priority is not low, it's actually just being promoted into the primary cache and deleted from this one.
+	if td.Metadata.Priority == priority.Low {
+		asp.cacheEvictionCallback(cacheName, id, td)
+	}
+}
+
+func (asp *atlassianSamplingProcessor) cacheEvictionCallback(cacheName string, id uint64, td *tracedata.TraceData) {
+	ctx := context.Background()
+	asp.log.Debug("evicting trace from cache",
+		zap.Uint64("traceID", id),
+		zap.String("cache", cacheName))
+
+	// Convert back to [16]byte to query. We only need the right 8-bytes from the uint64,
+	// since the cache only uses the right 8 bytes.
+	idArr := pcommon.NewTraceIDEmpty()
+	binary.LittleEndian.PutUint64(idArr[8:16], id)
+
+	// Check that we didn't actually sample this trace
+	_, sampled := asp.sampledDecisionCache.Get(idArr)
+
+	if !sampled {
+		// Mark as not sampled
+		asp.nonSampledDecisionCache.Put(idArr, &nsdOutcome{
+			decisionTime: time.Now(),
+		})
+		asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
+		asp.telemetry.ProcessorAtlassianSamplingPolicyDecisions.Add(ctx, 1,
+			metric.WithAttributes(
+				attribute.String("policy", "evicted"),
+				attribute.String("decision", evaluators.NotSampled.String()),
+				attribute.String("cache", cacheName),
+			))
+
+		// Only record eviction time when it was a trace that was not sampled, to avoid
+		// metrics being polluted with explicit cache deletions from traces being sampled and exported.
+		asp.telemetry.ProcessorAtlassianSamplingTraceEvictionTime.
+			Record(ctx, time.Since(td.Metadata.ArrivalTime).Seconds(),
+				metric.WithAttributes(attribute.String("cache", cacheName)))
 	}
 }
 

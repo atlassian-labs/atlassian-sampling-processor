@@ -278,6 +278,9 @@ func TestConsumeTraces_TraceDataPrioritised(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, priority.Low, td.GetPriority())
 	assert.Equal(t, int32(1), td.Metadata.SpanCount)
+	// fully evicted
+	_, ok = asp.nonSampledDecisionCache.Get(testTraceID)
+	assert.True(t, ok)
 
 	// promote testTraceID2 into regular priority
 	decider.NextDecision = evaluators.Pending
@@ -287,6 +290,9 @@ func TestConsumeTraces_TraceDataPrioritised(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, priority.Unspecified, td.GetPriority())
 	assert.Equal(t, int32(2), td.Metadata.SpanCount)
+	// evicted from secondary, but NOT fully evicted
+	_, ok = asp.nonSampledDecisionCache.Get(testTraceID2)
+	assert.False(t, ok)
 
 	// Other low priority decisions now shouldn't evict traceID2
 	decider.NextDecision = evaluators.LowPriority
@@ -307,6 +313,13 @@ func TestConsumeTraces_TraceDataPrioritised(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, priority.Low, td.GetPriority())
 	assert.Equal(t, int32(1), td.Metadata.SpanCount)
+
+	// now cause testTraceID2 to be sampled
+	assert.Equal(t, 0, sink.SpanCount())
+	decider.NextDecision = evaluators.Sampled
+	require.NoError(t, asp.ConsumeTraces(ctx, trace3))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+	assert.Equal(t, 3, sink.SpanCount())
 
 	require.NoError(t, asp.Shutdown(ctx))
 }
