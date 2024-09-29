@@ -165,6 +165,8 @@ func (asp *atlassianSamplingProcessor) Shutdown(parentCtx context.Context) error
 	if !asp.started.Load() {
 		return nil
 	}
+	asp.log.Info("shutdown of atlassianSamplingProcessor initiated")
+	defer asp.log.Info("shutdown of atlassianSamplingProcessor finished")
 
 	deadline := time.Now().Add(50 * time.Second)
 	ctx, cancel := context.WithDeadline(parentCtx, deadline)
@@ -210,6 +212,7 @@ func (asp *atlassianSamplingProcessor) ConsumeTraces(ctx context.Context, td ptr
 func (asp *atlassianSamplingProcessor) consumeChan() {
 	asp.waitGroup.Add(1)
 	defer asp.waitGroup.Done()
+	defer asp.log.Info("consumeChan() finished")
 	ctx := context.Background()
 
 	for {
