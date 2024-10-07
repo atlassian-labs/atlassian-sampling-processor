@@ -32,7 +32,7 @@ telemetry:
       unit: ns
       histogram:
         value_type: int
-        bucket_boundaries: [10000, 50000, 100000, 500000, 1000000, 5000000, 10000000, 50000000]
+        bucket_boundaries: [50000, 100000, 500000, 1000000, 5000000, 10000000, 50000000, 100000000, 1000000000, 1500000000]
     processor_atlassian_sampling_trace_eviction_time:
       enabled: true
       description: Time that a non-sampled trace was kept in memory from arrival to being evicted
