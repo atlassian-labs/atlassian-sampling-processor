@@ -58,7 +58,7 @@ func TestConsumeTraces_Basic(t *testing.T) {
 	host := componenttest.NewNopHost()
 
 	tracesSink := new(consumertest.TracesSink)
-	tracesProcessor, err := f.CreateTracesProcessor(ctx, set, cfg, tracesSink)
+	tracesProcessor, err := f.CreateTraces(ctx, set, cfg, tracesSink)
 	assert.NoError(t, err)
 	assert.NotNil(t, tracesProcessor)
 

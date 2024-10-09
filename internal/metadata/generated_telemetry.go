@@ -69,7 +69,8 @@ func NewTelemetryBuilder(settings component.TelemetrySettings, options ...Teleme
 	builder.ProcessorAtlassianSamplingChanBlockingTime, err = builder.meters[configtelemetry.LevelBasic].Int64Histogram(
 		"otelcol_processor_atlassian_sampling_chan_blocking_time",
 		metric.WithDescription("Amount of time spent blocking on the chan send in ConsumeTraces()"),
-		metric.WithUnit("ns"), metric.WithExplicitBucketBoundaries([]float64{50000, 100000, 500000, 1e+06, 5e+06, 1e+07, 5e+07, 1e+08, 1e+09, 1.5e+09}...),
+		metric.WithUnit("ns"),
+		metric.WithExplicitBucketBoundaries([]float64{50000, 100000, 500000, 1e+06, 5e+06, 1e+07, 5e+07, 1e+08, 1e+09, 1.5e+09}...),
 	)
 	errs = errors.Join(errs, err)
 	builder.ProcessorAtlassianSamplingDecisionEvictionTime, err = builder.meters[configtelemetry.LevelBasic].Float64Gauge(
