@@ -97,6 +97,7 @@ func TestConsumeTraces_CachedDataIsSent(t *testing.T) {
 	span.SetTraceID(testTraceID)
 
 	decider.NextDecision = evaluators.Pending
+	decider.NextDecisionPolicy = &policy{name: "test-policy", policyType: RootSpans}
 	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
 	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces())) // blocks until previous consumption is completed
 
@@ -128,7 +129,8 @@ func TestConsumeTraces_MultipleTracesInOneResourceSpan(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, asp)
 
-	decider := &mockDecider{NextDecision: evaluators.Sampled}
+	decider := &mockDecider{NextDecision: evaluators.Sampled,
+		NextDecisionPolicy: &policy{name: "test-policy", policyType: RootSpans}}
 	asp.decider = decider
 
 	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
@@ -171,7 +173,8 @@ func TestConsumeTraces_CacheMetadata(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, asp)
 
-	decider := &mockDecider{NextDecision: evaluators.Pending}
+	decider := &mockDecider{NextDecision: evaluators.Pending,
+		NextDecisionPolicy: &policy{name: "test-policy", policyType: RootSpans}}
 	asp.decider = decider
 
 	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
@@ -226,7 +229,7 @@ func TestConsumeTraces_TraceDataPrioritised(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, asp)
 
-	decider := &mockDecider{NextDecision: evaluators.LowPriority}
+	decider := &mockDecider{NextDecision: evaluators.LowPriority, NextDecisionPolicy: &policy{name: "test-policy", policyType: RootSpans}}
 	asp.decider = decider
 
 	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
@@ -284,6 +287,7 @@ func TestConsumeTraces_TraceDataPrioritised(t *testing.T) {
 
 	// promote testTraceID2 into regular priority
 	decider.NextDecision = evaluators.Pending
+	decider.NextDecisionPolicy = &policy{name: "test-policy2", policyType: Probabilistic}
 	require.NoError(t, asp.ConsumeTraces(ctx, trace3))
 	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
 	td, ok = asp.traceData.Get(testTraceID2)
@@ -296,6 +300,7 @@ func TestConsumeTraces_TraceDataPrioritised(t *testing.T) {
 
 	// Other low priority decisions now shouldn't evict traceID2
 	decider.NextDecision = evaluators.LowPriority
+	decider.NextDecisionPolicy = &policy{name: "test-policy2", policyType: Probabilistic}
 	trace4 := ptrace.NewTraces()
 	span4 := trace4.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
 	span4.SetTraceID(testTraceID3)
@@ -336,7 +341,8 @@ func TestConsumeTraces_PriorityNotDemoted(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, asp)
 
-	decider := &mockDecider{NextDecision: evaluators.Pending}
+	decider := &mockDecider{NextDecision: evaluators.Pending,
+		NextDecisionPolicy: &policy{name: "test-policy", policyType: RootSpans}}
 	asp.decider = decider
 
 	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
@@ -380,7 +386,8 @@ func TestShutdown_Flushes(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, asp)
 
-	decider := &mockDecider{NextDecision: evaluators.Pending}
+	decider := &mockDecider{NextDecision: evaluators.Pending,
+		NextDecisionPolicy: &policy{name: "test-policy", policyType: RootSpans}}
 	asp.decider = decider
 
 	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
@@ -451,7 +458,8 @@ func TestConsumeTraces_PrimaryCacheSizeConfigApplied(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, asp)
 
-	decider := &mockDecider{NextDecision: evaluators.Pending}
+	decider := &mockDecider{NextDecision: evaluators.Pending,
+		NextDecisionPolicy: &policy{name: "test-policy", policyType: RootSpans}}
 	asp.decider = decider
 
 	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
@@ -521,7 +529,8 @@ func TestConsumeTraces_SecondaryCacheSizeConfigApplied(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, asp)
 
-	decider := &mockDecider{NextDecision: evaluators.LowPriority}
+	decider := &mockDecider{NextDecision: evaluators.LowPriority,
+		NextDecisionPolicy: &policy{name: "test-policy", policyType: RootSpans}}
 	asp.decider = decider
 
 	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
@@ -574,6 +583,99 @@ func TestConsumeTraces_SecondaryCacheSizeConfigApplied(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, priority.Low, td.GetPriority())
 	assert.Equal(t, int32(1), td.Metadata.SpanCount)
+
+	require.NoError(t, asp.Shutdown(ctx))
+}
+
+func TestConsumeTraces_FirstLowPriorityDecisionWasMade_MetaDataUpdated(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := NewFactory()
+	cfg := (f.CreateDefaultConfig()).(*Config)
+
+	sink := &consumertest.TracesSink{}
+
+	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
+	require.NoError(t, err)
+	require.NotNil(t, asp)
+
+	decider := &mockDecider{NextDecision: evaluators.LowPriority,
+		NextDecisionPolicy: &policy{name: "test-policy",
+			policyType: RootSpans}}
+	asp.decider = decider
+
+	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
+
+	// Consume first trace at low priority
+	trace1 := ptrace.NewTraces()
+	span1 := trace1.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span1.SetTraceID(testTraceID)
+	span1.SetStartTimestamp(2)
+	span1.SetEndTimestamp(5)
+	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	td, ok := asp.traceData.Get(testTraceID)
+	assert.True(t, ok)
+	// Should store the policy name and evaluator to metadata
+	require.NotNil(t, td.Metadata.LastLowPriorityDecisionName)
+	assert.Equal(t, "test-policy", *td.Metadata.LastLowPriorityDecisionName)
+	assert.Equal(t, priority.Low, td.GetPriority())
+	require.NoError(t, asp.Shutdown(ctx))
+}
+
+func TestConsumeTraces_PromotedFromLowPriority(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := NewFactory()
+	cfg := (f.CreateDefaultConfig()).(*Config)
+
+	sink := &consumertest.TracesSink{}
+
+	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
+	require.NoError(t, err)
+	require.NotNil(t, asp)
+	// Set Metadata.LastLowPriorityDecisionName to test-policy
+	decider := &mockDecider{NextDecision: evaluators.LowPriority,
+		NextDecisionPolicy: &policy{name: "test-policy",
+			policyType: RootSpans}}
+	asp.decider = decider
+
+	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
+
+	// Consume first trace at low priority
+	trace1 := ptrace.NewTraces()
+	span1 := trace1.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span1.SetTraceID(testTraceID)
+	span1.SetStartTimestamp(2)
+	span1.SetEndTimestamp(5)
+	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	assert.Equal(t, 0, sink.SpanCount())
+	td, ok := asp.traceData.Get(testTraceID)
+	assert.True(t, ok)
+	assert.Equal(t, priority.Low, td.GetPriority())
+	assert.Equal(t, int32(1), td.Metadata.SpanCount)
+
+	decider.NextDecision = evaluators.Pending
+	decider.NextDecisionPolicy = &policy{name: "test-policy2", policyType: Probabilistic}
+
+	// Consume trace, same ID still low priority decision. Should be combined as low priority data
+	trace2 := ptrace.NewTraces()
+	span2 := trace2.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span2.SetTraceID(testTraceID)
+	span2.SetStartTimestamp(1)
+	span2.SetEndTimestamp(3)
+	require.NoError(t, asp.ConsumeTraces(ctx, trace2))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	assert.Equal(t, 0, sink.SpanCount())
+	td, ok = asp.traceData.Get(testTraceID)
+	assert.True(t, ok)
+	assert.Equal(t, priority.Unspecified, td.GetPriority())
+	assert.Nil(t, td.Metadata.LastLowPriorityDecisionName)
+	assert.Equal(t, int32(2), td.Metadata.SpanCount)
 
 	require.NoError(t, asp.Shutdown(ctx))
 }

@@ -49,6 +49,17 @@ func (d *decider) MakeDecision(ctx context.Context, id pcommon.TraceID, currentT
 			attribute.String("policy", p.name),
 			attribute.String("decision", decision.String()),
 		))
+
+		// Assume we have policy list [X, Y, Z],
+		// 1. Trace A/Span A is marked as low priority by a policy Z, we will set LastLowPriorityDecisionName to Z.
+		// 2. If Trace A/Span B comes and policy X/Y marks it as sampled/not sampled, we will reset LastLowPriorityDecisionName to nil.
+		// 3. If Trace A/Span C comes and policy X/Y marks it as Low, we will set priority to Pending, then reset LastLowPriorityDecisionName to nil and re-evaluate Z.
+		if mergedMetadata.LastLowPriorityDecisionName != nil &&
+			*mergedMetadata.LastLowPriorityDecisionName != p.name &&
+			decision == evaluators.LowPriority {
+			decision = evaluators.Pending
+		}
+
 		if decision == evaluators.Sampled || decision == evaluators.NotSampled || decision == evaluators.LowPriority {
 			return decision, p
 		}

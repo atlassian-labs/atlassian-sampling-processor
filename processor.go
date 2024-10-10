@@ -271,7 +271,12 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 		}
 
 		// Evaluate the spans against the policies.
-		finalDecision, _ := asp.decider.MakeDecision(ctx, id, currentTrace, mergedMetadata)
+		finalDecision, pol := asp.decider.MakeDecision(ctx, id, currentTrace, mergedMetadata)
+
+		// Reset LastLowPriorityDecisionName if the trace is promoted to a higher priority by any higher tier policy.
+		if mergedMetadata.LastLowPriorityDecisionName != nil && finalDecision != evaluators.LowPriority {
+			mergedMetadata.LastLowPriorityDecisionName = nil
+		}
 
 		switch finalDecision {
 		case evaluators.Sampled:
@@ -291,13 +296,17 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 			asp.traceData.Delete(id)
 			asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
 		default:
+			if finalDecision == evaluators.LowPriority {
+				td.Metadata.Priority = priority.Low
+				// Set LastLowPriorityDecisionPolicyMetadata when it's empty
+				if mergedMetadata.LastLowPriorityDecisionName == nil {
+					mergedMetadata.LastLowPriorityDecisionName = &pol.name
+				}
+				td.Metadata.LastLowPriorityDecisionName = mergedMetadata.LastLowPriorityDecisionName
+			}
 			// If we have reached here, the sampling decision is still pending, so we put trace data in the cache
 
 			// Priority of the metadata will affect the cache tier
-			if finalDecision == evaluators.LowPriority {
-				td.Metadata.Priority = priority.Low
-			}
-
 			if cachedTd, ok := asp.traceData.Get(id); ok {
 				cachedTd.AbsorbTraceData(td) // chooses higher priority in merge
 				td = cachedTd                // td is now the initial, incoming td + the cached td

@@ -20,6 +20,8 @@ type Metadata struct {
 	SpanCount int32
 	// Priority of the trace data. May be used to tier caching.
 	Priority priority.Priority
+	// LastLowPriorityDecisionName is the policy's name that was previously made decision to low priority.
+	LastLowPriorityDecisionName *string
 }
 
 // MergeWith merges the data from the other Metadata into this Metadata
@@ -33,6 +35,7 @@ func (m *Metadata) MergeWith(other *Metadata) {
 	m.EarliestStartTime = slices.Min([]pcommon.Timestamp{m.EarliestStartTime, other.EarliestStartTime})
 	m.LatestEndTime = slices.Max([]pcommon.Timestamp{m.LatestEndTime, other.LatestEndTime})
 	m.Priority = slices.Max([]priority.Priority{m.Priority, other.Priority})
+	m.LastLowPriorityDecisionName = other.LastLowPriorityDecisionName
 }
 
 // DeepCopy returns a deep copy of this Metadata

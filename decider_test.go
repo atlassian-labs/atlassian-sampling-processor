@@ -125,7 +125,7 @@ func TestMakeDecision(t *testing.T) {
 
 	telemetry, _ := metadata.NewTelemetryBuilder(componenttest.NewNopTelemetrySettings())
 	var traceData ptrace.Traces
-	var mergedMetadata *tracedata.Metadata
+	mergedMetadata := &tracedata.Metadata{}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			dec := newDecider(test.policies, zap.NewNop(), telemetry)
@@ -136,38 +136,140 @@ func TestMakeDecision(t *testing.T) {
 	}
 }
 
+func TestLastLowDecision(t *testing.T) {
+	t.Parallel()
+	testPols := setupTestPolicies()
+	tests := []struct {
+		name                       string
+		lastLowDecisionPolicyIndex int32
+		policies                   []*policy
+		expectDecision             evaluators.Decision
+		expectedPolicy             *policy
+	}{
+		{
+			/*
+			   [Policy A, Policy B]
+			   Span 1
+			     - A -> Pending
+			     - B -> Low
+			     - C -> Skipped
+
+			   LastLowPriorityDecisionName: B
+
+			   Span 2
+			     - A -> Sampled
+			     - B -> Skipped
+			     - C -> Skipped
+
+			   Expected Result: Sampled
+			*/
+			name:                       "Previously low priority decision is promoted to sampled",
+			lastLowDecisionPolicyIndex: 1,
+			policies: []*policy{
+				testPols.Policies["alwaysSample"],
+				testPols.Policies["alwaysLowPriority"],
+				testPols.Policies["alwaysPending"],
+			},
+			expectDecision: evaluators.Sampled,
+			expectedPolicy: testPols.Policies["alwaysSample"],
+		},
+		{
+			/*
+			   			   [Policy A, Policy B]
+			   			   Span 1
+			   			     - A -> Low
+			   			     - B -> Skipped
+			            LastLowPriorityDecisionName: A
+			   			   Span 2
+			   			     - A -> Pending
+			   			     - B -> Low
+
+			   			   Expected Result: Pending
+			*/
+			name:                       "Higher tier policy is return LowPriority, but not the last low priority decision return Pending",
+			lastLowDecisionPolicyIndex: 0,
+			policies: []*policy{
+				testPols.Policies["alwaysPending"],
+				testPols.Policies["alwaysLowPriority"],
+				testPols.Policies["alwaysPending"],
+			},
+			expectDecision: evaluators.Pending,
+			expectedPolicy: nil,
+		},
+		{
+			/*
+			   [Policy A, Policy B]
+			   Span 1
+			     - A -> Pending
+			     - B -> Low
+			   LastLowPriorityDecisionName: B
+			   Span 2
+			     - A -> Low
+			     - B -> Pending
+			   Expected Result: Pending
+			*/
+			name:                       "Higher tier policy is return LowPriority, but not the last low priority decision return Pending",
+			lastLowDecisionPolicyIndex: 1,
+			policies: []*policy{
+				testPols.Policies["alwaysLowPriority"],
+				testPols.Policies["alwaysPending"],
+			},
+			expectDecision: evaluators.Pending,
+			expectedPolicy: nil,
+		},
+	}
+
+	telemetry, _ := metadata.NewTelemetryBuilder(componenttest.NewNopTelemetrySettings())
+	var traceData ptrace.Traces
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			lastLowDecisionPolicy := test.policies[test.lastLowDecisionPolicyIndex]
+			var mergedMetadata = &tracedata.Metadata{LastLowPriorityDecisionName: &lastLowDecisionPolicy.name}
+			dec := newDecider(test.policies, zap.NewNop(), telemetry)
+			decision, policy := dec.MakeDecision(context.Background(), testTraceID, traceData, mergedMetadata)
+			assert.Equal(t, test.expectDecision, decision)
+			assert.Equal(t, test.expectedPolicy, policy)
+		})
+	}
+}
+
 func alwaysPending() *policy {
 	return &policy{
-		name:      "returns Pending " + strconv.FormatUint(uint64(rand.Uint32()), 16),
-		evaluator: evaluators.NewProbabilisticSampler("", 0),
+		name:       "returns Pending " + strconv.FormatUint(uint64(rand.Uint32()), 16),
+		evaluator:  evaluators.NewProbabilisticSampler("", 0),
+		policyType: Probabilistic,
 	}
 }
 
 func alwaysSample() *policy {
 	return &policy{
-		name:      "returns Sampled " + strconv.FormatUint(uint64(rand.Uint32()), 16),
-		evaluator: evaluators.NewProbabilisticSampler("", 100.0),
+		name:       "returns Sampled " + strconv.FormatUint(uint64(rand.Uint32()), 16),
+		evaluator:  evaluators.NewProbabilisticSampler("", 100.0),
+		policyType: Probabilistic,
 	}
 }
 
 func hardNotSampled() *policy {
 	return &policy{
-		name:      "returns NotSampled " + strconv.FormatUint(uint64(rand.Uint32()), 16),
-		evaluator: &staticTestEvaluator{d: evaluators.NotSampled},
+		name:       "returns NotSampled " + strconv.FormatUint(uint64(rand.Uint32()), 16),
+		evaluator:  &staticTestEvaluator{d: evaluators.NotSampled},
+		policyType: Probabilistic,
 	}
 }
 
 func alwaysLowPriority() *policy {
 	return &policy{
-		name:      "returns LowPriority " + strconv.FormatUint(uint64(rand.Uint32()), 16),
-		evaluator: &staticTestEvaluator{d: evaluators.LowPriority},
+		name:       "returns LowPriority " + strconv.FormatUint(uint64(rand.Uint32()), 16),
+		evaluator:  &staticTestEvaluator{d: evaluators.LowPriority},
+		policyType: RootSpans,
 	}
 }
 
 func alwaysError() *policy {
 	return &policy{
-		name:      "always error " + strconv.FormatUint(uint64(rand.Uint32()), 16),
-		evaluator: &staticTestEvaluator{d: evaluators.Unspecified, e: fmt.Errorf("test error")},
+		name:       "always error " + strconv.FormatUint(uint64(rand.Uint32()), 16),
+		evaluator:  &staticTestEvaluator{d: evaluators.Unspecified, e: fmt.Errorf("test error")},
+		policyType: OTTLCondition,
 	}
 }
 
