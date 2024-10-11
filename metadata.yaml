@@ -72,4 +72,10 @@ telemetry:
       unit: "{traces}"
       gauge:
         value_type: int
-
+    processor_atlassian_sampling_internal_error_dropped_spans:
+      enabled: true
+      description: Number of spans that have been dropped due to an internal error
+      unit: "{spans}"
+      sum:
+        value_type: int
+        monotonic: true

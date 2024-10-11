@@ -679,3 +679,56 @@ func TestConsumeTraces_PromotedFromLowPriority(t *testing.T) {
 
 	require.NoError(t, asp.Shutdown(ctx))
 }
+
+func TestConsumeTraces_Basic_Compression(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	cfg := createDefaultConfig().(*Config)
+	cfg.CompressionEnabled = true
+	sink := &consumertest.TracesSink{}
+
+	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
+	assert.True(t, asp.compress)
+	require.NoError(t, err)
+
+	decider := &mockDecider{}
+	asp.decider = decider
+
+	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
+
+	// Put this trace into the cache with compression enabled
+	trace1 := ptrace.NewTraces()
+	span1 := trace1.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span1.SetTraceID(testTraceID)
+	span1.Attributes().PutStr("test", "value")
+	assert.NoError(t, asp.ConsumeTraces(ctx, trace1))
+	assert.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	// Put another trace into the cache to absorb into the cached trace
+	trace2 := ptrace.NewTraces()
+	span2 := trace2.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span2.SetTraceID(testTraceID)
+	span2.Attributes().PutStr("test", "value2")
+	assert.NoError(t, asp.ConsumeTraces(ctx, trace2))
+	assert.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	// Make a sampling decision with another trace to get the uncompressed trace
+	decider.NextDecision = evaluators.Sampled
+	trace4 := ptrace.NewTraces()
+	span4 := trace4.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span4.SetTraceID(testTraceID)
+	span4.Attributes().PutStr("test", "value4")
+	assert.NoError(t, asp.ConsumeTraces(ctx, trace4))
+	assert.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	consumed := sink.AllTraces()
+	// Both cached and the one just sampled
+	assert.Len(t, consumed, 2)
+	consumedTrace1 := consumed[0]
+	consumedTrace2 := consumed[1]
+	assert.Equal(t, 2, consumedTrace1.ResourceSpans().Len())
+	assert.Equal(t, 1, consumedTrace2.ResourceSpans().Len())
+
+	assert.NoError(t, asp.Shutdown(ctx))
+}

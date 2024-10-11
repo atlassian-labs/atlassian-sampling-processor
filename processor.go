@@ -3,6 +3,7 @@ package atlassiansamplingprocessor // import "bitbucket.org/atlassian/observabil
 import (
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -61,6 +62,7 @@ type atlassianSamplingProcessor struct {
 	shutdownStart   chan time.Time
 	waitGroup       sync.WaitGroup
 	flushOnShutdown bool
+	compress        bool
 	started         atomic.Bool
 }
 
@@ -89,6 +91,7 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 		incomingTraces:  make(chan ptrace.Traces),
 		shutdownStart:   make(chan time.Time),
 		flushOnShutdown: cfg.FlushOnShutdown,
+		compress:        cfg.CompressionEnabled,
 	}
 
 	primaryCache, err := cache.NewLRUCache[*tracedata.TraceData](
@@ -261,7 +264,22 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 
 		currentTrace := ptrace.NewTraces()
 		appendToTraces(currentTrace, resourceSpans, spans)
-		td := tracedata.NewTraceData(time.Now(), currentTrace, priority.Unspecified)
+
+		td, err := tracedata.NewTraceData(time.Now(), currentTrace, priority.Unspecified, asp.compress)
+		if err != nil {
+			asp.log.Error(
+				"failed to create trace data",
+				zap.Error(err),
+				zap.String("traceID", hex.EncodeToString(id[:])),
+				zap.Int("spanCount", currentTrace.SpanCount()),
+				zap.Bool("compress", asp.compress),
+			)
+			asp.telemetry.ProcessorAtlassianSamplingInternalErrorDroppedSpans.Add(
+				ctx,
+				int64(currentTrace.SpanCount()),
+			)
+			continue
+		}
 
 		// Merge metadata with any metadata in the cache to pass to evaluators
 		mergedMetadata := td.Metadata.DeepCopy()
@@ -283,10 +301,24 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 			// Sample, cache decision, and release all data associated with the trace
 			asp.sampledDecisionCache.Put(id, time.Now())
 			if cachedData, ok := asp.traceData.Get(id); ok {
-				asp.releaseSampledTrace(ctx, cachedData.GetTraces())
+				cachedTraces, err := cachedData.GetTraces()
+				if err != nil {
+					asp.log.Error(
+						"failed to retrieve cached traces",
+						zap.Error(err),
+						zap.String("traceID", hex.EncodeToString(id[:])),
+						zap.Int32("spanCount", cachedData.Metadata.SpanCount),
+					)
+					asp.telemetry.ProcessorAtlassianSamplingInternalErrorDroppedSpans.Add(
+						ctx,
+						int64(cachedData.Metadata.SpanCount),
+					)
+				} else {
+					asp.releaseSampledTrace(ctx, cachedTraces)
+				}
 				asp.traceData.Delete(id)
 			}
-			asp.releaseSampledTrace(ctx, td.GetTraces())
+			asp.releaseSampledTrace(ctx, currentTrace)
 			asp.telemetry.ProcessorAtlassianSamplingTracesSampled.Add(ctx, 1)
 		case evaluators.NotSampled:
 			// Cache decision, delete any associated data
@@ -308,8 +340,20 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 
 			// Priority of the metadata will affect the cache tier
 			if cachedTd, ok := asp.traceData.Get(id); ok {
-				cachedTd.AbsorbTraceData(td) // chooses higher priority in merge
-				td = cachedTd                // td is now the initial, incoming td + the cached td
+				err := cachedTd.AbsorbTraceData(td) // chooses higher priority in merge
+				if err != nil {
+					asp.log.Error(
+						"failed to merge into cached traces",
+						zap.Error(err),
+						zap.String("traceID", hex.EncodeToString(id[:])),
+						zap.Int32("spanCount", td.Metadata.SpanCount),
+					)
+					asp.telemetry.ProcessorAtlassianSamplingInternalErrorDroppedSpans.Add(
+						ctx,
+						int64(td.Metadata.SpanCount),
+					)
+				}
+				td = cachedTd // td is now the initial, incoming td + the cached td
 			}
 			asp.traceData.Put(id, td)
 		}
@@ -346,9 +390,24 @@ func (asp *atlassianSamplingProcessor) flushAll(ctx context.Context) error {
 	var err error
 	vals := asp.traceData.Values()
 	for i, td := range vals {
+		cachedTraces, errGetTraces := td.GetTraces()
+		if errGetTraces != nil {
+			asp.log.Error(
+				"failed to retrieve cached traces",
+				zap.Error(errGetTraces),
+				zap.Int32("spanCount", td.Metadata.SpanCount),
+			)
+			asp.telemetry.ProcessorAtlassianSamplingInternalErrorDroppedSpans.Add(
+				ctx,
+				int64(td.Metadata.SpanCount),
+			)
+
+			err = multierr.Append(err, errGetTraces)
+			continue
+		}
 
 		// Increment flush count attribute
-		rs := td.GetTraces().ResourceSpans()
+		rs := cachedTraces.ResourceSpans()
 		for j := 0; j < rs.Len(); j++ {
 			var flushes int64 = 0
 			rsAttrs := rs.At(j).Resource().Attributes()
@@ -364,7 +423,7 @@ func (asp *atlassianSamplingProcessor) flushAll(ctx context.Context) error {
 				"flush could not complete due to context cancellation, "+
 				"only flushed %d out of %d traces: %w", i, len(vals), ctx.Err())
 		default:
-			err = multierr.Append(err, asp.next.ConsumeTraces(ctx, td.GetTraces()))
+			err = multierr.Append(err, asp.next.ConsumeTraces(ctx, cachedTraces))
 		}
 	}
 	return err

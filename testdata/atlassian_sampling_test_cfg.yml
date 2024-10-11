@@ -5,6 +5,7 @@ atlassian_sampling:
   decision_cache:
     sampled_cache_size: 1000
     non_sampled_cache_size: 10000
+  compression_enabled: true
   policies:
     [
       {

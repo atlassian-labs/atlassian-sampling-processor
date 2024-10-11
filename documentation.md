@@ -30,6 +30,14 @@ Time that a trace ID spent in the decision cache before it was evicted
 | ---- | ----------- | ---------- |
 | s | Gauge | Double |
 
+### otelcol_processor_atlassian_sampling_internal_error_dropped_spans
+
+Number of spans that have been dropped due to an internal error
+
+| Unit | Metric Type | Value Type | Monotonic |
+| ---- | ----------- | ---------- | --------- |
+| {spans} | Sum | Int | true |
+
 ### otelcol_processor_atlassian_sampling_overly_eager_lonely_root_span_decisions
 
 Number of spans that have been aggressively sampled out by root span policy

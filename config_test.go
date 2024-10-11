@@ -40,6 +40,7 @@ func TestLoadConfig(t *testing.T) {
 			SecondaryCacheSize: 100,
 			TargetHeapBytes:    100_000_000,
 			DecisionCacheCfg:   DecisionCacheCfg{SampledCacheSize: 1000, NonSampledCacheSize: 10000},
+			CompressionEnabled: true,
 			PolicyConfig: []PolicyConfig{
 				{
 					SharedPolicyConfig: SharedPolicyConfig{

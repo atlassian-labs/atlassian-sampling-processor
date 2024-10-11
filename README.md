@@ -64,6 +64,12 @@ routing them accordingly, for example using the `routingconnector`.
 Additionally, the attribute counts how many times that it's been flushed and re-ingested, 
 enabling the detection of infinite cycling.
 
+### `compression_enabled`
+
+If this is enabled, trace data stored in the primary and secondary caches are marshalled and
+compressed using the Snappy algorithm, and decompressed once a sampling decision is made.
+The default value is `false`.
+
 ### `policies`
 
 `policies` is a list of policies, which configure how the sampling decisions are evaluated against the incoming data.
