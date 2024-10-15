@@ -3,6 +3,7 @@ package atlassiansamplingprocessor
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,6 +32,11 @@ var testTraceID2 pcommon.TraceID = [16]byte{
 var testTraceID3 pcommon.TraceID = [16]byte{
 	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 	0xa0, 0xb9, 0xc0, 0xd1, 0xe2, 0xf3, 0xf1, 0xf2,
+}
+
+var testTraceID4 pcommon.TraceID = [16]byte{
+	0xde, 0xad, 0xbe, 0xef, 0xba, 0xdd, 0xec, 0xaf,
+	0xde, 0xad, 0xbe, 0xef, 0xba, 0xdd, 0xec, 0xaf,
 }
 
 type mockDecider struct {
@@ -115,6 +121,62 @@ func TestConsumeTraces_CachedDataIsSent(t *testing.T) {
 	// Both the first and second span should now have been released.
 	// The first one being cached, being released once the trace satisfies the policy.
 	assert.Equal(t, 2, sink.SpanCount())
+}
+
+func TestConsumeTraces_DecisionCachesAreRespected(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := NewFactory()
+	cfg := (f.CreateDefaultConfig()).(*Config)
+	sink := &consumertest.TracesSink{}
+
+	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
+	require.NoError(t, err)
+	require.NotNil(t, asp)
+
+	decider := &mockDecider{NextDecision: evaluators.Sampled}
+	asp.decider = decider
+	decider.NextDecision = evaluators.Sampled
+
+	trace1 := ptrace.NewTraces()
+	span1 := trace1.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span1.SetTraceID(testTraceID)
+
+	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
+	// should be sampled by policy
+	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+	assert.Equal(t, 1, sink.SpanCount())
+	sink.Reset()
+
+	decider.NextDecision = evaluators.Pending
+	// send again, this should also be let through
+	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+	assert.Equal(t, 1, sink.SpanCount())
+	_, ok := asp.sampledDecisionCache.Get(testTraceID)
+	assert.True(t, ok)
+	sink.Reset()
+
+	// clear sampled cache
+	asp.sampledDecisionCache.Clear()
+	// cause a NotSampled decision, populating nonSampledDecision cache
+	decider.NextDecision = evaluators.NotSampled
+	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+	assert.Equal(t, 0, sink.SpanCount())
+	_, ok = asp.nonSampledDecisionCache.Get(testTraceID)
+	assert.True(t, ok)
+
+	// Should be dropped because cached NotSampled decision
+	decider.NextDecision = evaluators.Sampled
+	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+	assert.Equal(t, 0, sink.SpanCount())
+	_, ok = asp.traceData.Get(testTraceID)
+	assert.False(t, ok)
+
+	assert.NoError(t, asp.Shutdown(ctx))
 }
 
 func TestConsumeTraces_MultipleTracesInOneResourceSpan(t *testing.T) {
@@ -374,7 +436,77 @@ func TestConsumeTraces_PriorityNotDemoted(t *testing.T) {
 	require.NoError(t, asp.Shutdown(ctx))
 }
 
+func TestConsumeTraces_DecisionSpanArrival(t *testing.T) {
+	// Test the handling of decisions encoded as spans (presumably sent by another shutting-down tail sampler)
+	t.Parallel()
+	ctx := context.Background()
+	f := NewFactory()
+	cfg := (f.CreateDefaultConfig()).(*Config)
+	cfg.FlushOnShutdown = true
+	sink := &consumertest.TracesSink{}
+	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
+	require.NoError(t, err)
+	require.NotNil(t, asp)
+
+	decider := &mockDecider{NextDecision: evaluators.Pending}
+	asp.decider = decider
+
+	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
+
+	// populate decision caches
+	asp.sampledDecisionCache.Put(testTraceID, time.Now())
+	asp.nonSampledDecisionCache.Put(testTraceID2, &nsdOutcome{decisionTime: time.Now()})
+
+	// populate trace data cache
+	trace := ptrace.NewTraces()
+	spans := trace.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans()
+	span1 := spans.AppendEmpty()
+	span1.SetTraceID(testTraceID3)
+	span1.SetName("real span that will be sampled")
+	span2 := spans.AppendEmpty()
+	span2.SetTraceID(testTraceID4)
+	span2.SetName("real span that will not be sampled")
+	require.NoError(t, asp.ConsumeTraces(ctx, trace))
+
+	// decision spans for already decTrace with already cached "yes" decision, one that's true and one that's false
+	decTrace := ptrace.NewTraces()
+	decTrace.ResourceSpans().AppendEmpty().Resource().Attributes().PutBool(decisionSpanKey, true)
+	decTrace.ResourceSpans().At(0).ScopeSpans().AppendEmpty().Spans().AppendEmpty().SetTraceID(testTraceID)
+	decTrace.ResourceSpans().AppendEmpty().Resource().Attributes().PutBool(decisionSpanKey, false)
+	decTrace.ResourceSpans().At(0).ScopeSpans().AppendEmpty().Spans().AppendEmpty().SetTraceID(testTraceID)
+
+	// decision spans for already decTrace with already cached "no" decision, one that's true and one that's false
+	decTrace.ResourceSpans().AppendEmpty().Resource().Attributes().PutBool(decisionSpanKey, true)
+	decTrace.ResourceSpans().At(1).ScopeSpans().AppendEmpty().Spans().AppendEmpty().SetTraceID(testTraceID2)
+	decTrace.ResourceSpans().AppendEmpty().Resource().Attributes().PutBool(decisionSpanKey, false)
+	decTrace.ResourceSpans().At(1).ScopeSpans().AppendEmpty().Spans().AppendEmpty().SetTraceID(testTraceID2)
+
+	// "yes" decision span for testTraceID3
+	decTrace.ResourceSpans().AppendEmpty().Resource().Attributes().PutBool(decisionSpanKey, true)
+	decTrace.ResourceSpans().At(2).ScopeSpans().AppendEmpty().Spans().AppendEmpty().SetTraceID(testTraceID3)
+
+	// "no" decision span for testTraceID4
+	decTrace.ResourceSpans().AppendEmpty().Resource().Attributes().PutBool(decisionSpanKey, false)
+	decTrace.ResourceSpans().At(3).ScopeSpans().AppendEmpty().Spans().AppendEmpty().SetTraceID(testTraceID4)
+
+	require.NoError(t, asp.ConsumeTraces(ctx, decTrace))
+	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+
+	assert.Equal(t, 1, sink.SpanCount())
+	output := sink.AllTraces()
+	assert.Equal(t, 1, len(output))
+	outputSpan := output[0].ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0)
+	assert.Equal(t, "real span that will be sampled", outputSpan.Name())
+	assert.Equal(t, testTraceID3, outputSpan.TraceID())
+
+	sink.Reset()
+	require.NoError(t, asp.Shutdown(ctx))
+	// 4 decisions spans + 1 cached trace data
+	assert.Equal(t, 5, sink.SpanCount())
+}
+
 func TestShutdown_Flushes(t *testing.T) {
+	// Test data is flushed upon shutdown, including cached trace data and decision spans
 	t.Parallel()
 	ctx := context.Background()
 	f := NewFactory()
@@ -392,6 +524,10 @@ func TestShutdown_Flushes(t *testing.T) {
 
 	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
 
+	// populate decision caches, these should appear as decision spans
+	asp.sampledDecisionCache.Put(testTraceID2, time.Now())
+	asp.nonSampledDecisionCache.Put(testTraceID3, &nsdOutcome{decisionTime: time.Now()})
+
 	// One trace, two ResourceSpans, one with the flushes attr already set
 	trace := ptrace.NewTraces()
 	span1 := trace.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
@@ -407,26 +543,51 @@ func TestShutdown_Flushes(t *testing.T) {
 
 	assert.NoError(t, asp.Shutdown(context.Background()))
 
-	assert.Equal(t, 2, sink.SpanCount())
-	sentData := sink.AllTraces()
-	require.Equal(t, 1, len(sentData))
-	require.Equal(t, 2, sentData[0].ResourceSpans().Len())
+	// flushAll() clears decision caches
+	assert.Equal(t, 0, len(asp.sampledDecisionCache.Keys()))
+	assert.Equal(t, 0, len(asp.nonSampledDecisionCache.Keys()))
 
-	// First resource (didn't initially have any flushes set)
-	v, ok := sentData[0].ResourceSpans().At(0).Resource().Attributes().Get(flushCountKey)
+	assert.Equal(t, 4, sink.SpanCount())
+	sentData := sink.AllTraces()
+	require.Equal(t, 2, len(sentData))
+	require.Equal(t, 2, sentData[0].ResourceSpans().Len()) // sampled and non sampled rs
+	require.Equal(t, 2, sentData[1].ResourceSpans().Len()) // two actual trace data resources
+
+	// sampled decision span
+	sdSpan := sentData[0].ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0)
+	resAttrs := sentData[0].ResourceSpans().At(0).Resource().Attributes()
+	v, ok := resAttrs.Get(decisionSpanKey)
+	assert.True(t, ok)
+	assert.True(t, v.Bool())
+	assert.Equal(t, "decision", sdSpan.Name())
+	assert.Equal(t, testTraceID2, sdSpan.TraceID())
+
+	// non-sampled decision span
+	nsdSpan := sentData[0].ResourceSpans().At(1).ScopeSpans().At(0).Spans().At(0)
+	resAttrs = sentData[0].ResourceSpans().At(1).Resource().Attributes()
+	v, ok = resAttrs.Get(decisionSpanKey)
+	assert.True(t, ok)
+	assert.False(t, v.Bool())
+	assert.Equal(t, "decision", nsdSpan.Name())
+	assert.Equal(t, testTraceID3, nsdSpan.TraceID())
+
+	// First tracedata resource (didn't initially have any flushes set)
+	v, ok = sentData[1].ResourceSpans().At(0).Resource().Attributes().Get(flushCountKey)
 	require.True(t, ok)
 	flushes := v.Int()
 	assert.Equal(t, int64(1), flushes)
 
-	// Second resource (had incoming flush count of 5)
-	v, ok = sentData[0].ResourceSpans().At(1).Resource().Attributes().Get(flushCountKey)
+	// Second tracedata resource (had incoming flush count of 5)
+	v, ok = sentData[1].ResourceSpans().At(1).Resource().Attributes().Get(flushCountKey)
 	require.True(t, ok)
 	flushes = v.Int()
 	assert.Equal(t, int64(6), flushes)
+
 }
 
 func TestShutdown_TimesOut(t *testing.T) {
 	// This test verifies that shutdown times out when the context reaches its deadline.
+	t.Parallel()
 	ctx := context.Background()
 	f := NewFactory()
 	cfg := (f.CreateDefaultConfig()).(*Config)

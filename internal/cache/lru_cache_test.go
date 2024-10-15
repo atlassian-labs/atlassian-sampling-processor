@@ -23,9 +23,11 @@ var testTelem = func() *metadata.TelemetryBuilder {
 	return tb
 }()
 
+var nopEvictCB = func(pcommon.TraceID, bool) {}
+
 func TestSinglePut(t *testing.T) {
 	t.Parallel()
-	c, err := NewLRUCache[int](2, func(uint64, int) {}, testTelem)
+	c, err := NewLRUCache[int](2, func(pcommon.TraceID, int) {}, testTelem)
 	require.NoError(t, err)
 	id := traceIDFromHex(t, "12341234123412341234123412341234")
 	c.Put(id, 123)
@@ -36,7 +38,7 @@ func TestSinglePut(t *testing.T) {
 
 func TestExceedsSizeLimit(t *testing.T) {
 	t.Parallel()
-	c, err := NewLRUCache[bool](2, func(uint64, bool) {}, testTelem)
+	c, err := NewLRUCache[bool](2, nopEvictCB, testTelem)
 	require.NoError(t, err)
 	id1 := traceIDFromHex(t, "12341234123412341234123412341231")
 	id2 := traceIDFromHex(t, "12341234123412341234123412341232")
@@ -59,7 +61,7 @@ func TestExceedsSizeLimit(t *testing.T) {
 
 func TestLeastRecentlyUsedIsEvicted(t *testing.T) {
 	t.Parallel()
-	c, err := NewLRUCache[bool](2, func(uint64, bool) {}, testTelem)
+	c, err := NewLRUCache[bool](2, nopEvictCB, testTelem)
 	require.NoError(t, err)
 	id1 := traceIDFromHex(t, "12341234123412341234123412341231")
 	id2 := traceIDFromHex(t, "12341234123412341234123412341232")
@@ -85,7 +87,7 @@ func TestLeastRecentlyUsedIsEvicted(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	t.Parallel()
-	c, err := NewLRUCache[bool](2, func(uint64, bool) {}, testTelem)
+	c, err := NewLRUCache[bool](2, nopEvictCB, testTelem)
 	require.NoError(t, err)
 	id := traceIDFromHex(t, "12341234123412341234123412341231")
 	c.Put(id, true)
@@ -101,7 +103,7 @@ func TestGetValues(t *testing.T) {
 	t.Parallel()
 	id1 := traceIDFromHex(t, "11111111111111111111111111111111")
 	id2 := traceIDFromHex(t, "22222222222222222222222222222222")
-	c, err := NewLRUCache[int](2, func(uint64, int) {}, testTelem)
+	c, err := NewLRUCache[int](2, func(pcommon.TraceID, int) {}, testTelem)
 	require.NoError(t, err)
 
 	c.Put(id1, 1)
@@ -111,31 +113,30 @@ func TestGetValues(t *testing.T) {
 	assert.Equal(t, []int{1, 2}, vals)
 }
 
-func TestOnlyUsesRightHalfTraceID(t *testing.T) {
+func TestGetKeys(t *testing.T) {
 	t.Parallel()
-	c, err := NewLRUCache[int](5, func(uint64, int) {}, testTelem)
+	id1 := traceIDFromHex(t, "11111111111111111111111111111111")
+	id2 := traceIDFromHex(t, "22222222222222222222222222222222")
+	c, err := NewLRUCache[int](2, func(pcommon.TraceID, int) {}, testTelem)
 	require.NoError(t, err)
 
-	// Same right half
-	id1 := traceIDFromHex(t, "00000000000000001111111111111111")
-	id2 := traceIDFromHex(t, "ffffffffffffffff1111111111111111")
 	c.Put(id1, 1)
 	c.Put(id2, 2)
-
-	res, _ := c.Get(id1)
-	assert.Equal(t, 2, res, "the put of id2 should overwrite id1's")
+	keys := c.Keys()
+	// least recently used should be at start of slice
+	assert.Equal(t, []pcommon.TraceID{id1, id2}, keys)
 }
 
 func TestZeroSizeReturnsError(t *testing.T) {
 	t.Parallel()
-	c, err := NewLRUCache[bool](0, func(uint64, bool) {}, testTelem)
+	c, err := NewLRUCache[bool](0, nopEvictCB, testTelem)
 	assert.Error(t, err)
 	assert.Nil(t, c)
 }
 
 func TestSize(t *testing.T) {
 	t.Parallel()
-	c, _ := NewLRUCache[bool](2, func(uint64, bool) {}, testTelem)
+	c, _ := NewLRUCache[bool](2, nopEvictCB, testTelem)
 	assert.Equal(t, 2, c.Size())
 	c.Put(traceIDFromHex(t, "00000000000000001111111111111111"), true)
 	assert.Equal(t, 2, c.Size())
@@ -147,7 +148,7 @@ func TestSize(t *testing.T) {
 
 func TestResize(t *testing.T) {
 	t.Parallel()
-	c, _ := NewLRUCache[bool](2, func(uint64, bool) {}, testTelem)
+	c, _ := NewLRUCache[bool](2, nopEvictCB, testTelem)
 	id1 := traceIDFromHex(t, "00000000000000001111111111111111")
 	id2 := traceIDFromHex(t, "00000000000000001111111111111112")
 	c.Put(id1, true)
@@ -174,6 +175,26 @@ func TestResize(t *testing.T) {
 	assert.True(t, ok)
 	_, ok = c.Get(id3)
 	assert.True(t, ok)
+}
+
+func TestClear(t *testing.T) {
+	t.Parallel()
+	c, _ := NewLRUCache[bool](2, nopEvictCB, testTelem)
+	assert.Equal(t, 2, c.Size())
+	assert.Equal(t, 0, len(c.Keys()))
+	id1 := traceIDFromHex(t, "00000000000000001111111111111111")
+	id2 := traceIDFromHex(t, "00000000000000001111111111111112")
+	c.Put(id1, true)
+	c.Put(id2, true)
+	assert.Equal(t, 2, c.Size())
+	assert.Equal(t, 2, len(c.Keys()))
+
+	c.Clear()
+	assert.Equal(t, 2, c.Size())
+	assert.Equal(t, 0, len(c.Keys()))
+	v, ok := c.Get(id1)
+	assert.False(t, ok)
+	assert.False(t, v)
 }
 
 func traceIDFromHex(t testing.TB, idStr string) pcommon.TraceID {

@@ -21,6 +21,10 @@ type Cache[V any] interface {
 	// Values returns a slice of all values in the cache.
 	// The slice must be safe to modify by the caller.
 	Values() []V
+	// Keys returns a slice of all trace IDs in the cache
+	Keys() []pcommon.TraceID
+	// Clear removes all entry from the cache
+	Clear()
 }
 
 type Sizer interface {

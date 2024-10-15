@@ -9,6 +9,11 @@ status:
 
 tests:
 
+attributes:
+  success:
+    description: "indicates success of operation"
+    type: bool
+
 telemetry:
   level: basic
   metrics:
@@ -76,6 +81,14 @@ telemetry:
       enabled: true
       description: Number of spans that have been dropped due to an internal error
       unit: "{spans}"
+      sum:
+        value_type: int
+        monotonic: true
+    processor_atlassian_sampling_flushes:
+      enabled: true
+      description: Number of flushes
+      unit: "{flushes}"
+      attributes: [success]
       sum:
         value_type: int
         monotonic: true

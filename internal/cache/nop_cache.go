@@ -30,8 +30,14 @@ func (n *nopDecisionCache[V]) Values() []V {
 	return make([]V, 0)
 }
 
+func (n *nopDecisionCache[V]) Keys() []pcommon.TraceID {
+	return make([]pcommon.TraceID, 0)
+}
+
 func (n *nopDecisionCache[V]) Size() int {
 	return 0
 }
 
 func (n *nopDecisionCache[V]) Resize(_ int) {}
+
+func (n *nopDecisionCache[V]) Clear() {}

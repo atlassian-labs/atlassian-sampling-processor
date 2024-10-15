@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component/componenttest"
+	"go.opentelemetry.io/collector/pdata/pcommon"
 
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/cache"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/metadata"
@@ -27,7 +28,7 @@ func (hg *heapGetterMock) GetHeapUsage() uint64 {
 func TestRegulatorAdjustsCacheSize(t *testing.T) {
 	t.Parallel()
 	hgm := &heapGetterMock{heap: 100}
-	c, err := cache.NewLRUCache[bool](100, func(uint64, bool) {}, testTelem)
+	c, err := cache.NewLRUCache[bool](100, func(pcommon.TraceID, bool) {}, testTelem)
 	require.NoError(t, err)
 	r, err := NewRegulator(50, 100, 1000, hgm.GetHeapUsage, c)
 	require.NoError(t, err)
@@ -57,7 +58,7 @@ func TestRegulatorAdjustsCacheSize(t *testing.T) {
 func TestRegulatorValidatesInput(t *testing.T) {
 	t.Parallel()
 	hgm := &heapGetterMock{heap: 100}
-	c, _ := cache.NewLRUCache[bool](100, func(uint64, bool) {}, testTelem)
+	c, _ := cache.NewLRUCache[bool](100, func(pcommon.TraceID, bool) {}, testTelem)
 
 	// Invalid minSize
 	r, err := NewRegulator(-1, 1, 1, hgm.GetHeapUsage, c)

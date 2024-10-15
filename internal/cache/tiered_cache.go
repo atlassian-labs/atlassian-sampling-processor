@@ -57,9 +57,18 @@ func (tc *tieredCache[V]) Values() []V {
 	return slices.Concat(tc.primary.Values(), tc.secondary.Values())
 }
 
+func (tc *tieredCache[V]) Keys() []pcommon.TraceID {
+	return slices.Concat(tc.primary.Keys(), tc.secondary.Keys())
+}
+
 func (tc *tieredCache[V]) Size() int {
 	return tc.primary.Size() + tc.secondary.Size()
 }
 
 // Resize is not supported on tieredCache
 func (tc *tieredCache[V]) Resize(_ int) {}
+
+func (tc *tieredCache[V]) Clear() {
+	tc.primary.Clear()
+	tc.secondary.Clear()
+}

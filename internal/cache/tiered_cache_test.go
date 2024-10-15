@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/collector/pdata/pcommon"
 
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/priority"
 )
@@ -63,6 +64,8 @@ func TestTieredCache(t *testing.T) {
 	vals := c.Values()
 	assert.Equal(t, []*testPriorityGetter{tpgHigh, tpgLow}, vals)
 
+	assert.Equal(t, []pcommon.TraceID{id0, id1}, c.Keys())
+
 	c.Delete(id0)
 	v, ok = c.Get(id0)
 	assert.False(t, ok)
@@ -73,8 +76,33 @@ func TestTieredCache(t *testing.T) {
 	assert.False(t, ok)
 	assert.Nil(t, v)
 
-	vals = c.Values()
-	assert.Equal(t, 0, len(vals))
+	assert.Equal(t, 0, len(c.Values()))
+	assert.Equal(t, 0, len(c.Keys()))
+}
+
+func TestTieredClear(t *testing.T) {
+	primary, err := NewLRUCache[*testPriorityGetter](10, nil, testTelem)
+	require.NoError(t, err)
+	secondary, err := NewLRUCache[*testPriorityGetter](10, nil, testTelem)
+	require.NoError(t, err)
+	c, err := NewTieredCache[*testPriorityGetter](primary, secondary)
+	require.NoError(t, err)
+	require.NotNil(t, c)
+
+	id0 := traceIDFromHex(t, "12341234123412341234123412341234")
+	id1 := traceIDFromHex(t, "56785678567856785678567856785678")
+	c.Put(id0, tpgLow)
+	c.Put(id1, tpgHigh)
+
+	assert.Equal(t, 20, c.Size())
+	assert.Equal(t, 2, len(c.Keys()))
+	c.Clear()
+	assert.Equal(t, 20, c.Size())
+	assert.Equal(t, 0, len(c.Keys()))
+	_, ok := c.Get(id0)
+	assert.False(t, ok)
+	_, ok = c.Get(id1)
+	assert.False(t, ok)
 }
 
 func TestConstruction_Errors(t *testing.T) {

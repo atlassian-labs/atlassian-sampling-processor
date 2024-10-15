@@ -8,7 +8,6 @@ package cache // import "bitbucket.org/atlassian/observability-sidecar/pkg/proce
 
 import (
 	"context"
-	"encoding/binary"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"go.opentelemetry.io/collector/pdata/pcommon"
@@ -26,7 +25,7 @@ var (
 
 // lruCache implements Cache as a simple LRU cache.
 type lruCache[V any] struct {
-	cache     *lru.Cache[uint64, V]
+	cache     *lru.Cache[pcommon.TraceID, V]
 	telemetry *metadata.TelemetryBuilder
 	size      int
 }
@@ -36,8 +35,8 @@ var _ Cache[any] = (*lruCache[any])(nil)
 // NewLRUCache returns a new lruCache.
 // The size parameter indicates the amount of keys the cache will hold before it
 // starts evicting the least recently used key.
-func NewLRUCache[V any](size int, onEvicted func(uint64, V), telemetry *metadata.TelemetryBuilder) (Cache[V], error) {
-	c, err := lru.NewWithEvict[uint64, V](size, onEvicted)
+func NewLRUCache[V any](size int, onEvicted func(pcommon.TraceID, V), telemetry *metadata.TelemetryBuilder) (Cache[V], error) {
+	c, err := lru.NewWithEvict[pcommon.TraceID, V](size, onEvicted)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +44,7 @@ func NewLRUCache[V any](size int, onEvicted func(uint64, V), telemetry *metadata
 }
 
 func (c *lruCache[V]) Get(id pcommon.TraceID) (V, bool) {
-	v, ok := c.cache.Get(rightHalfTraceID(id))
+	v, ok := c.cache.Get(id)
 	if ok {
 		c.telemetry.ProcessorAtlassianSamplingCacheReads.
 			Add(context.Background(), 1, trueAttr)
@@ -57,15 +56,19 @@ func (c *lruCache[V]) Get(id pcommon.TraceID) (V, bool) {
 }
 
 func (c *lruCache[V]) Put(id pcommon.TraceID, v V) {
-	_ = c.cache.Add(rightHalfTraceID(id), v)
+	_ = c.cache.Add(id, v)
 }
 
 func (c *lruCache[V]) Delete(id pcommon.TraceID) {
-	c.cache.Remove(rightHalfTraceID(id))
+	c.cache.Remove(id)
 }
 
 func (c *lruCache[V]) Values() []V {
 	return c.cache.Values()
+}
+
+func (c *lruCache[V]) Keys() []pcommon.TraceID {
+	return c.cache.Keys()
 }
 
 // Size returns the current capacity of the LRU cache
@@ -80,6 +83,7 @@ func (c *lruCache[V]) Resize(size int) {
 	c.size = size
 }
 
-func rightHalfTraceID(id pcommon.TraceID) uint64 {
-	return binary.LittleEndian.Uint64(id[8:])
+// Clear deletes all entries in the cache
+func (c *lruCache[V]) Clear() {
+	c.cache.Purge()
 }

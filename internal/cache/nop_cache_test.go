@@ -23,4 +23,5 @@ func TestNopCache(t *testing.T) {
 	assert.Equal(t, 0, c.Size())
 	c.Resize(100)
 	assert.Equal(t, 0, c.Size())
+	c.Clear()
 }

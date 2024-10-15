@@ -2,7 +2,6 @@ package atlassiansamplingprocessor // import "bitbucket.org/atlassian/observabil
 
 import (
 	"context"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"sync"
@@ -28,6 +27,7 @@ import (
 )
 
 const flushCountKey = "atlassiansampling.flushes"
+const decisionSpanKey = "atlassiansampling.decision"
 const memTickerInterval = 10 * time.Second
 
 var (
@@ -63,6 +63,7 @@ type atlassianSamplingProcessor struct {
 	waitGroup       sync.WaitGroup
 	flushOnShutdown bool
 	compress        bool
+	maxFlushes      int
 	started         atomic.Bool
 }
 
@@ -91,6 +92,7 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 		incomingTraces:  make(chan ptrace.Traces),
 		shutdownStart:   make(chan time.Time),
 		flushOnShutdown: cfg.FlushOnShutdown,
+		maxFlushes:      cfg.MaxFlushes,
 		compress:        cfg.CompressionEnabled,
 	}
 
@@ -274,10 +276,8 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 				zap.Int("spanCount", currentTrace.SpanCount()),
 				zap.Bool("compress", asp.compress),
 			)
-			asp.telemetry.ProcessorAtlassianSamplingInternalErrorDroppedSpans.Add(
-				ctx,
-				int64(currentTrace.SpanCount()),
-			)
+			asp.telemetry.ProcessorAtlassianSamplingInternalErrorDroppedSpans.
+				Add(ctx, int64(currentTrace.SpanCount()))
 			continue
 		}
 
@@ -303,30 +303,21 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 			if cachedData, ok := asp.traceData.Get(id); ok {
 				cachedTraces, err := cachedData.GetTraces()
 				if err != nil {
-					asp.log.Error(
-						"failed to retrieve cached traces",
+					asp.log.Error("failed to retrieve cached traces",
 						zap.Error(err),
 						zap.String("traceID", hex.EncodeToString(id[:])),
-						zap.Int32("spanCount", cachedData.Metadata.SpanCount),
 					)
-					asp.telemetry.ProcessorAtlassianSamplingInternalErrorDroppedSpans.Add(
-						ctx,
-						int64(cachedData.Metadata.SpanCount),
-					)
+					asp.telemetry.
+						ProcessorAtlassianSamplingInternalErrorDroppedSpans.Add(ctx, int64(cachedData.Metadata.SpanCount))
 				} else {
-					asp.releaseSampledTrace(ctx, cachedTraces)
+					asp.sendSampledTraceData(ctx, cachedTraces)
 				}
 				asp.traceData.Delete(id)
 			}
-			asp.releaseSampledTrace(ctx, currentTrace)
+			asp.sendSampledTraceData(ctx, currentTrace)
 			asp.telemetry.ProcessorAtlassianSamplingTracesSampled.Add(ctx, 1)
 		case evaluators.NotSampled:
-			// Cache decision, delete any associated data
-			asp.nonSampledDecisionCache.Put(id, &nsdOutcome{
-				decisionTime: time.Now(),
-			})
-			asp.traceData.Delete(id)
-			asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
+			asp.releaseNotSampledTrace(ctx, id)
 		default:
 			if finalDecision == evaluators.LowPriority {
 				td.Metadata.Priority = priority.Low
@@ -337,7 +328,6 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 				td.Metadata.LastLowPriorityDecisionName = mergedMetadata.LastLowPriorityDecisionName
 			}
 			// If we have reached here, the sampling decision is still pending, so we put trace data in the cache
-
 			// Priority of the metadata will affect the cache tier
 			if cachedTd, ok := asp.traceData.Get(id); ok {
 				err := cachedTd.AbsorbTraceData(td) // chooses higher priority in merge
@@ -348,10 +338,8 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 						zap.String("traceID", hex.EncodeToString(id[:])),
 						zap.Int32("spanCount", td.Metadata.SpanCount),
 					)
-					asp.telemetry.ProcessorAtlassianSamplingInternalErrorDroppedSpans.Add(
-						ctx,
-						int64(td.Metadata.SpanCount),
-					)
+					asp.telemetry.ProcessorAtlassianSamplingInternalErrorDroppedSpans.
+						Add(ctx, int64(td.Metadata.SpanCount))
 				}
 				td = cachedTd // td is now the initial, incoming td + the cached td
 			}
@@ -360,25 +348,63 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 	}
 }
 
+// cachedDecision checks to see if a decision has already been made for this trace,
+// and sends/drops if a pre-existing decision exists.
+// If the incoming span is a decision span, and the decision conflicts with the current decision caches,
+// then the decision span will be ignored.
 func (asp *atlassianSamplingProcessor) cachedDecision(
 	ctx context.Context,
 	id pcommon.TraceID,
 	resourceSpans ptrace.ResourceSpans,
 	spans []spanAndScope,
 ) bool {
+	decision, isDecisionSpan := resourceSpans.Resource().Attributes().Get(decisionSpanKey)
+
+	// check decision caches
 	if _, ok := asp.sampledDecisionCache.Get(id); ok {
-		td := ptrace.NewTraces()
-		appendToTraces(td, resourceSpans, spans)
-		asp.releaseSampledTrace(ctx, td)
+		// export if not decision span
+		if !isDecisionSpan {
+			td := ptrace.NewTraces()
+			appendToTraces(td, resourceSpans, spans)
+			asp.sendSampledTraceData(ctx, td)
+		}
 		return true
 	}
 	if _, ok := asp.nonSampledDecisionCache.Get(id); ok {
 		return true
 	}
-	return false
+
+	if !isDecisionSpan {
+		return false
+	}
+
+	// This is a decision span, handle it
+	if decision.Bool() {
+		if td, ok := asp.traceData.Get(id); ok {
+			cachedData, err := td.GetTraces()
+			if err != nil {
+				asp.log.Error("error getting trace", zap.Error(err))
+			}
+			asp.sendSampledTraceData(ctx, cachedData)
+			asp.traceData.Delete(id)
+		}
+		asp.sampledDecisionCache.Put(id, time.Now())
+	} else {
+		asp.releaseNotSampledTrace(ctx, id)
+	}
+	return true
 }
 
-func (asp *atlassianSamplingProcessor) releaseSampledTrace(ctx context.Context, td ptrace.Traces) {
+// sendSampledTraceData sends the given trace data to the next component in the pipeline.
+// It removes the flush count attr to indicate this is not data flushed on shutdown.
+// This function specifically does NOT emit metrics, alter decision caches, or delete trace data from caches.
+// This is because it can receive data for traces that have pre-existing, cached decisions.
+// The mentioned actions are left to the caller.
+func (asp *atlassianSamplingProcessor) sendSampledTraceData(ctx context.Context, td ptrace.Traces) {
+	rs := td.ResourceSpans()
+	for i := 0; i < rs.Len(); i++ {
+		_ = rs.At(i).Resource().Attributes().Remove(flushCountKey)
+	}
 	if err := asp.next.ConsumeTraces(ctx, td); err != nil {
 		asp.log.Warn(
 			"Error sending spans to destination",
@@ -386,8 +412,54 @@ func (asp *atlassianSamplingProcessor) releaseSampledTrace(ctx context.Context, 
 	}
 }
 
+// releaseNotSampledTrace removes references to traces that have been decided to be not sampled.
+// It also caches the non sampled decision, and increments count of traces not sampled.
+func (asp *atlassianSamplingProcessor) releaseNotSampledTrace(ctx context.Context, id pcommon.TraceID) {
+	asp.traceData.Delete(id)
+	asp.nonSampledDecisionCache.Put(id, &nsdOutcome{
+		decisionTime: time.Now(),
+	})
+	asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
+}
+
 func (asp *atlassianSamplingProcessor) flushAll(ctx context.Context) error {
 	var err error
+	defer func() {
+		asp.telemetry.ProcessorAtlassianSamplingFlushes.
+			Add(ctx, 1,
+				metric.WithAttributes(attribute.Bool("success", err == nil)))
+	}()
+
+	// prepare decisions spans, which are decisions encoded as spans
+	decisionTraces := ptrace.NewTraces()
+	sampledDecisionRs := decisionTraces.ResourceSpans().AppendEmpty()
+	sampledDecisionRs.Resource().Attributes().PutBool(decisionSpanKey, true)
+	sampledDecisionSpans := sampledDecisionRs.ScopeSpans().AppendEmpty().Spans()
+	sampledIDs := asp.sampledDecisionCache.Keys()
+	asp.sampledDecisionCache.Clear()
+	sampledDecisionSpans.EnsureCapacity(len(sampledIDs))
+	for _, id := range sampledIDs {
+		s := sampledDecisionSpans.AppendEmpty()
+		s.SetTraceID(id)
+		s.SetName("decision")
+	}
+
+	nonSampledDecisionRs := decisionTraces.ResourceSpans().AppendEmpty()
+	nonSampledDecisionRs.Resource().Attributes().PutBool(decisionSpanKey, false)
+	nonSampledDecisionSpans := nonSampledDecisionRs.ScopeSpans().AppendEmpty().Spans()
+	nonSampledIDs := asp.nonSampledDecisionCache.Keys()
+	asp.nonSampledDecisionCache.Clear()
+	nonSampledDecisionSpans.EnsureCapacity(len(nonSampledIDs))
+	for _, id := range nonSampledIDs {
+		s := nonSampledDecisionSpans.AppendEmpty()
+		s.SetTraceID(id)
+		s.SetName("decision")
+	}
+
+	// flush decision spans
+	err = multierr.Append(err, asp.next.ConsumeTraces(ctx, decisionTraces))
+
+	// flush cached trace data
 	vals := asp.traceData.Values()
 	for i, td := range vals {
 		cachedTraces, errGetTraces := td.GetTraces()
@@ -405,8 +477,9 @@ func (asp *atlassianSamplingProcessor) flushAll(ctx context.Context) error {
 			err = multierr.Append(err, errGetTraces)
 			continue
 		}
-
-		// Increment flush count attribute
+		// Increment flush count attribute.
+		// Must be on resource attributes because routing connector only supports routing on resource attributes,
+		// and we must keep decisions spans from being batched in the same resource as actual trace data.
 		rs := cachedTraces.ResourceSpans()
 		for j := 0; j < rs.Len(); j++ {
 			var flushes int64 = 0
@@ -419,9 +492,10 @@ func (asp *atlassianSamplingProcessor) flushAll(ctx context.Context) error {
 		}
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf(""+
+			err = multierr.Append(err, fmt.Errorf(
 				"flush could not complete due to context cancellation, "+
-				"only flushed %d out of %d traces: %w", i, len(vals), ctx.Err())
+					"only flushed %d out of %d traces: %w", i, len(vals), ctx.Err()))
+			return err
 		default:
 			err = multierr.Append(err, asp.next.ConsumeTraces(ctx, cachedTraces))
 		}
@@ -429,41 +503,25 @@ func (asp *atlassianSamplingProcessor) flushAll(ctx context.Context) error {
 	return err
 }
 
-func (asp *atlassianSamplingProcessor) primaryEvictionCallback(id uint64, td *tracedata.TraceData) {
-	cacheName := "primary"
-	asp.cacheEvictionCallback(cacheName, id, td)
+func (asp *atlassianSamplingProcessor) primaryEvictionCallback(id pcommon.TraceID, td *tracedata.TraceData) {
+	asp.cacheEvictionCallback("primary", id, td)
 }
 
-func (asp *atlassianSamplingProcessor) secondaryEvictionCallback(id uint64, td *tracedata.TraceData) {
-	cacheName := "secondary"
-
+func (asp *atlassianSamplingProcessor) secondaryEvictionCallback(id pcommon.TraceID, td *tracedata.TraceData) {
 	// This trace is only being truly evicted if the priority is still low.
 	// If it's priority is not low, it's actually just being promoted into the primary cache and deleted from this one.
 	if td.Metadata.Priority == priority.Low {
-		asp.cacheEvictionCallback(cacheName, id, td)
+		asp.cacheEvictionCallback("secondary", id, td)
 	}
 }
 
-func (asp *atlassianSamplingProcessor) cacheEvictionCallback(cacheName string, id uint64, td *tracedata.TraceData) {
+func (asp *atlassianSamplingProcessor) cacheEvictionCallback(cacheName string, id pcommon.TraceID, td *tracedata.TraceData) {
 	ctx := context.Background()
-	asp.log.Debug("evicting trace from cache",
-		zap.Uint64("traceID", id),
-		zap.String("cache", cacheName))
-
-	// Convert back to [16]byte to query. We only need the right 8-bytes from the uint64,
-	// since the cache only uses the right 8 bytes.
-	idArr := pcommon.NewTraceIDEmpty()
-	binary.LittleEndian.PutUint64(idArr[8:16], id)
-
 	// Check that we didn't actually sample this trace
-	_, sampled := asp.sampledDecisionCache.Get(idArr)
+	_, sampled := asp.sampledDecisionCache.Get(id)
 
 	if !sampled {
-		// Mark as not sampled
-		asp.nonSampledDecisionCache.Put(idArr, &nsdOutcome{
-			decisionTime: time.Now(),
-		})
-		asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
+		asp.releaseNotSampledTrace(ctx, id)
 		asp.telemetry.ProcessorAtlassianSamplingPolicyDecisions.Add(ctx, 1,
 			metric.WithAttributes(
 				attribute.String("policy", "evicted"),
@@ -479,14 +537,18 @@ func (asp *atlassianSamplingProcessor) cacheEvictionCallback(cacheName string, i
 	}
 }
 
-func (asp *atlassianSamplingProcessor) onEvictSampled(id uint64, insertTime time.Time) {
-	asp.log.Debug("evicting sampled decision", zap.Uint64("traceID", id))
-	asp.telemetry.ProcessorAtlassianSamplingDecisionEvictionTime.
-		Record(context.Background(), time.Since(insertTime).Seconds(), sampledAttr)
+func (asp *atlassianSamplingProcessor) onEvictSampled(_ pcommon.TraceID, insertTime time.Time) {
+	if asp.started.Load() {
+		// only record eviction time if processor is running / not shutting down
+		asp.telemetry.ProcessorAtlassianSamplingDecisionEvictionTime.
+			Record(context.Background(), time.Since(insertTime).Seconds(), sampledAttr)
+	}
 }
 
-func (asp *atlassianSamplingProcessor) onEvictNotSampled(id uint64, outcome *nsdOutcome) {
-	asp.log.Debug("evicting not-sampled decision", zap.Uint64("traceID", id))
-	asp.telemetry.ProcessorAtlassianSamplingDecisionEvictionTime.
-		Record(context.Background(), time.Since(outcome.decisionTime).Seconds(), notSampledAttr)
+func (asp *atlassianSamplingProcessor) onEvictNotSampled(_ pcommon.TraceID, outcome *nsdOutcome) {
+	if asp.started.Load() {
+		// only record eviction time if processor is running / not shutting down
+		asp.telemetry.ProcessorAtlassianSamplingDecisionEvictionTime.
+			Record(context.Background(), time.Since(outcome.decisionTime).Seconds(), notSampledAttr)
+	}
 }
