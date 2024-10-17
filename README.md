@@ -27,6 +27,9 @@ The `primary_cache_size` value should be greater than 0, and should be set to a 
 `processor_atlassian_sampling_trace_eviction_time` metric to tune how long you would like your traces to stay pending
 in memory before being considered not-sampled.
 
+The primary cache size is initially set to 80% of the `primary_cache_size` value.
+It is automatically adjusted depending on heap memory usage at runtime, but will not exceed the `primary_cache_size` value.
+
 ### `secondary_cache_size`
 
 The amount of traces with low priority that are held in the secondary internal LRU cache.

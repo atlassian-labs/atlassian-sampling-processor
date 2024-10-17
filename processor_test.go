@@ -610,7 +610,10 @@ func TestConsumeTraces_PrimaryCacheSizeConfigApplied(t *testing.T) {
 	ctx := context.Background()
 	f := NewFactory()
 	cfg := (f.CreateDefaultConfig()).(*Config)
-	cfg.PrimaryCacheSize = 2 // 2 primary cache size -> 2 non-low priority cache size
+
+	// We start with 80% of the specified cache size.
+	// So a max cache size of 3 results in an initial cache size of 2
+	cfg.PrimaryCacheSize = 3
 	cfg.SecondaryCacheSize = 1
 
 	sink := &consumertest.TracesSink{}

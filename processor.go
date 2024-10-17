@@ -96,8 +96,11 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 		compress:        cfg.CompressionEnabled,
 	}
 
+	// Start with 80% of max cache size, the memory regulator will adjust the cache size as needed
+	initialPrimaryCacheSize := int(0.8 * float64(cfg.PrimaryCacheSize))
+
 	primaryCache, err := cache.NewLRUCache[*tracedata.TraceData](
-		cfg.PrimaryCacheSize,
+		initialPrimaryCacheSize,
 		asp.primaryEvictionCallback,
 		telemetry)
 	if err != nil {
