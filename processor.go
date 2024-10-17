@@ -104,16 +104,20 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 		return nil, err
 	}
 
-	secondaryCache, err := cache.NewLRUCache[*tracedata.TraceData](
-		cfg.SecondaryCacheSize,
-		asp.secondaryEvictionCallback,
-		telemetry)
-	if err != nil {
-		return nil, err
-	}
-	asp.traceData, err = cache.NewTieredCache[*tracedata.TraceData](primaryCache, secondaryCache)
-	if err != nil {
-		return nil, err
+	asp.traceData = primaryCache
+
+	if cfg.SecondaryCacheSize > 0 {
+		secondaryCache, err2 := cache.NewLRUCache[*tracedata.TraceData](
+			cfg.SecondaryCacheSize,
+			asp.secondaryEvictionCallback,
+			telemetry)
+		if err2 != nil {
+			return nil, err2
+		}
+		asp.traceData, err2 = cache.NewTieredCache[*tracedata.TraceData](primaryCache, secondaryCache)
+		if err2 != nil {
+			return nil, err2
+		}
 	}
 
 	asp.sampledDecisionCache, err = cache.NewLRUCache[time.Time](cfg.SampledCacheSize, asp.onEvictSampled, telemetry)

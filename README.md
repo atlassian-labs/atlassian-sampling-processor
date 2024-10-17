@@ -32,7 +32,11 @@ in memory before being considered not-sampled.
 The amount of traces with low priority that are held in the secondary internal LRU cache.
 When this value reaches max, the least-recently-used trace is evicted and considered as "not sampled".
 
-The `secondary_cache_size` value should be greater than 0, and should be less than 50% of `primary_cache_size`.
+The `secondary_cache_size` value should be less than 50% of `primary_cache_size`.
+
+If left at 0, there will be no secondary cache, and only the primary cache will be used.
+
+The default value is 0.
 
 __Note: It will overwrite any entries of the same key in either the primary or secondary cache to prevent a key appearing in both primary and secondary. 
 If the caller wants to promote an existing key from secondary to primary, they can Put with non-low priority.__
