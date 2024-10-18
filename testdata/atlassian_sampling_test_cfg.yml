@@ -84,5 +84,16 @@ atlassian_sampling:
           rate_getter: test_rate_getter,
           default_rate: 0.01,
         }
+      },
+      {
+        name: test-policy-10,
+        type: downgrader,
+        downgrader: {
+          downgrade_to: "NotSampled",
+          sub_policy: {
+            type: probabilistic,
+            probabilistic: { sampling_percentage: 0 }
+          }
+        }
       }
     ]

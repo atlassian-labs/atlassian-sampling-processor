@@ -99,6 +99,7 @@ Current supported policy types are:
 - `latency` - samples traces with duration equal to or greater than threshold_ms. The duration is determined by looking at the earliest start time and latest end time, without taking into consideration what happened in between.
 - `status_code` - samples based upon the status code (OK, ERROR or UNSET)
 - `ottl_condition` - samples based on given boolean OTTL condition (span and span event).
+- `downgrader` - downgrades any "Sampled" decision from the `sub_policy`, to what is specified in `downgrade_to`. 
 
 ### Example
 

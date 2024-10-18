@@ -149,6 +149,21 @@ func TestLoadConfig(t *testing.T) {
 						},
 					},
 				},
+				{
+					SharedPolicyConfig: SharedPolicyConfig{
+						Name: "test-policy-10",
+						Type: "downgrader",
+					},
+					DowngraderConfig: DowngraderConfig{
+						DowngradeTo: "NotSampled",
+						SubPolicyCfg: SharedPolicyConfig{
+							Type: "probabilistic",
+							ProbabilisticConfig: ProbabilisticConfig{
+								SamplingPercentage: 0,
+							},
+						},
+					},
+				},
 			},
 		})
 }

@@ -83,6 +83,8 @@ func getPolicyEvaluator(cfg *PolicyConfig, set component.TelemetrySettings) (eva
 		return getNewAndPolicy(&cfg.AndConfig, set)
 	case RootSpans:
 		return getNewRootSpansPolicy(&cfg.RootSpansConfig, set)
+	case Downgrader:
+		return getNewDowngraderPolicy(&cfg.DowngraderConfig, set)
 	default:
 		return getSharedPolicyEvaluator(&cfg.SharedPolicyConfig, set)
 	}
@@ -143,4 +145,16 @@ func getNewRootSpansPolicy(cfg *RootSpansConfig, set component.TelemetrySettings
 		return nil, err
 	}
 	return evaluators.NewRootSpan(subPolicy), nil
+}
+
+func getNewDowngraderPolicy(cfg *DowngraderConfig, set component.TelemetrySettings) (evaluators.PolicyEvaluator, error) {
+	subPolicy, err := getSharedPolicyEvaluator(&cfg.SubPolicyCfg, set)
+	if err != nil {
+		return nil, err
+	}
+	downgradeTo, err := evaluators.StringToDecision(cfg.DowngradeTo)
+	if err != nil {
+		return nil, err
+	}
+	return evaluators.NewDowngrader(downgradeTo, subPolicy)
 }

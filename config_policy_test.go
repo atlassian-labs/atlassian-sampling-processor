@@ -45,4 +45,8 @@ func TestPolicyCreationFromConfig(t *testing.T) {
 	assert.Equal(t, Threshold, policies[7].policyType)
 	assert.Equal(t, "test-policy-9", policies[8].name)
 	assert.Equal(t, RemoteProbabilistic, policies[8].policyType)
+	assert.Equal(t, "test-policy-10", policies[9].name)
+	assert.Equal(t, Downgrader, policies[9].policyType)
+
+	assert.Equal(t, 10, len(policies), "wrong number of assertions")
 }

@@ -8,6 +8,7 @@ package evaluators // import "bitbucket.org/atlassian/observability-sidecar/pkg/
 
 import (
 	"context"
+	"fmt"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
@@ -46,6 +47,22 @@ func (d Decision) String() string {
 		return "LowPriority"
 	}
 	return ""
+}
+
+func StringToDecision(s string) (Decision, error) {
+	switch s {
+	case "Unspecified":
+		return Unspecified, nil
+	case "Pending":
+		return Pending, nil
+	case "Sampled":
+		return Sampled, nil
+	case "NotSampled":
+		return NotSampled, nil
+	case "LowPriority":
+		return LowPriority, nil
+	}
+	return Unspecified, fmt.Errorf("expected valid decision string, got: %s", s)
 }
 
 // PolicyEvaluator implements a tail-based sampling policy evaluator,

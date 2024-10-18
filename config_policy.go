@@ -20,6 +20,8 @@ type PolicyConfig struct {
 	AndConfig AndConfig `mapstructure:"and"`
 
 	RootSpansConfig RootSpansConfig `mapstructure:"root_spans"`
+
+	DowngraderConfig DowngraderConfig `mapstructure:"downgrader"`
 }
 
 // SharedPolicyConfig holds the common configuration to all policies that are used in derivative policy configurations
@@ -79,6 +81,11 @@ type RootSpansConfig struct {
 	SubPolicyCfg SharedPolicyConfig `mapstructure:"sub_policy"`
 }
 
+type DowngraderConfig struct {
+	DowngradeTo  string             `mapstructure:"downgrade_to"`
+	SubPolicyCfg SharedPolicyConfig `mapstructure:"sub_policy"`
+}
+
 // LatencyConfig holds the configurable settings to create a latency filter sampling policy
 // evaluator
 type LatencyConfig struct {
@@ -123,6 +130,8 @@ const (
 	Probabilistic PolicyType = "probabilistic"
 	// And allows defining a policy, combining the other policies in one
 	And PolicyType = "and"
+	// Downgrader downgrades a sampled decision
+	Downgrader PolicyType = "downgrader"
 	// SpanCount sample traces that are have more spans per Trace than a given threshold.
 	SpanCount PolicyType = "span_count"
 	// RootSpans allows a sub-policy to be defined, and operates the sub-policy only on root spans with no children.
