@@ -63,7 +63,6 @@ type atlassianSamplingProcessor struct {
 	waitGroup       sync.WaitGroup
 	flushOnShutdown bool
 	compress        bool
-	maxFlushes      int
 	started         atomic.Bool
 }
 
@@ -92,7 +91,6 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 		incomingTraces:  make(chan ptrace.Traces),
 		shutdownStart:   make(chan time.Time),
 		flushOnShutdown: cfg.FlushOnShutdown,
-		maxFlushes:      cfg.MaxFlushes,
 		compress:        cfg.CompressionEnabled,
 	}
 

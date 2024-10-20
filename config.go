@@ -29,9 +29,6 @@ type Config struct {
 	// FlushOnShutdown determines whether to flush the pending/cached trace data upon shutdown.
 	FlushOnShutdown bool `mapstructure:"flush_on_shutdown"`
 
-	// MaxFlushes is the maximum number of times a trace can be flushed before it is dropped.
-	MaxFlushes int `mapstructure:"max_flushes"`
-
 	// CompressionEnabled compresses trace data in the primary and secondary caches if enabled
 	CompressionEnabled bool `mapstructure:"compression_enabled"`
 }
