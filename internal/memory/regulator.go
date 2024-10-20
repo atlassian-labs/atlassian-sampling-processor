@@ -13,6 +13,10 @@ const lowerThreshold float64 = 0.9
 
 type HeapGetter func() uint64
 
+type RegulatorI interface {
+	RegulateCacheSize() int
+}
+
 type Regulator struct {
 	minSize      int
 	maxSize      int

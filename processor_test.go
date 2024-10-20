@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/collector/processor/processortest"
 
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/evaluators"
+	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/memory"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/priority"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 )
@@ -52,6 +53,20 @@ func (m *mockDecider) MakeDecision(ctx context.Context, id pcommon.TraceID, curr
 
 func (m *mockDecider) Start(ctx context.Context, host component.Host) error {
 	return nil
+}
+
+type mockRegulator struct {
+	RegulateCacheSizeMock int
+	onRegulateCacheSize   func()
+}
+
+var _ memory.RegulatorI = (*mockRegulator)(nil)
+
+func (m *mockRegulator) RegulateCacheSize() int {
+	if m.onRegulateCacheSize != nil {
+		m.onRegulateCacheSize()
+	}
+	return m.RegulateCacheSizeMock
 }
 
 func TestConsumeTraces_Basic(t *testing.T) {
@@ -894,5 +909,49 @@ func TestConsumeTraces_Basic_Compression(t *testing.T) {
 	assert.Equal(t, 2, consumedTrace1.ResourceSpans().Len())
 	assert.Equal(t, 1, consumedTrace2.ResourceSpans().Len())
 
+	assert.NoError(t, asp.Shutdown(ctx))
+}
+
+func TestMemoryRegulateCacheSizeCalledOnTickerSignal(t *testing.T) {
+	ctx := context.Background()
+	f := NewFactory()
+	cfg := (f.CreateDefaultConfig()).(*Config)
+	// Set the target heap size to 1000 bytes to trigger the channel
+	cfg.TargetHeapBytes = 1000
+	sink := &consumertest.TracesSink{}
+
+	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
+	require.NoError(t, err)
+	require.NotNil(t, asp)
+	// Create a mock ticker and set it to asp
+	mockTicker := make(chan time.Time)
+	asp.memTicker = &time.Ticker{C: mockTicker}
+	// Create a mock regulator and set it to asp
+	mockReg := &mockRegulator{RegulateCacheSizeMock: 50}
+	asp.memRegulator = mockReg
+
+	// Channel to signal when RegulateCacheSize is called
+	done := make(chan struct{})
+	mockReg.onRegulateCacheSize = func() {
+		// Close done channel to signal that the method has been called
+		close(done)
+	}
+
+	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
+
+	// Simulate the ticker signal
+	mockTicker <- time.Now()
+
+	// Check if the RegulateCacheSize method is called
+	assert.Eventually(t, func() bool {
+		select {
+		case <-done:
+			return true
+		default:
+			return false
+		}
+	}, 5*time.Second, 10*time.Millisecond, "RegulateCacheSize should have been called")
+
+	// Verify if the RegulateCacheSize method has been called
 	assert.NoError(t, asp.Shutdown(ctx))
 }

@@ -54,7 +54,7 @@ type atlassianSamplingProcessor struct {
 	incomingTraces chan ptrace.Traces
 	// memRegulator can adjust cache sizes to target a given heap usage.
 	// May be nil, in which case the cache sizes will not be adjusted.
-	memRegulator *memory.Regulator
+	memRegulator memory.RegulatorI
 	// memTicker controls how often the memRegulator is called
 	memTicker *time.Ticker
 	// shutdownStart is a chan used to signal to the async goroutine to start shutdown.
