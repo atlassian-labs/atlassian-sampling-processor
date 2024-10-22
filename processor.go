@@ -29,6 +29,7 @@ import (
 const flushCountKey = "atlassiansampling.flushes"
 const decisionSpanKey = "atlassiansampling.decision"
 const memTickerInterval = 10 * time.Second
+const traceIDLoggingKey = "traceId"
 
 var (
 	sampledAttr    = metric.WithAttributes(attribute.String("decision", "sampled"))
@@ -274,15 +275,9 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 
 		td, err := tracedata.NewTraceData(time.Now(), currentTrace, priority.Unspecified, asp.compress)
 		if err != nil {
-			asp.log.Error(
-				"failed to create trace data",
-				zap.Error(err),
-				zap.String("traceID", hex.EncodeToString(id[:])),
-				zap.Int("spanCount", currentTrace.SpanCount()),
-				zap.Bool("compress", asp.compress),
-			)
-			asp.telemetry.ProcessorAtlassianSamplingInternalErrorDroppedSpans.
-				Add(ctx, int64(currentTrace.SpanCount()))
+			asp.reportTraceDataErr(ctx, err, int64(currentTrace.SpanCount()),
+				zap.String(traceIDLoggingKey, hex.EncodeToString(id[:])),
+				zap.Bool("compress", asp.compress))
 			continue
 		}
 
@@ -306,14 +301,9 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 			// Sample, cache decision, and release all data associated with the trace
 			asp.sampledDecisionCache.Put(id, time.Now())
 			if cachedData, ok := asp.traceData.Get(id); ok {
-				cachedTraces, err := cachedData.GetTraces()
-				if err != nil {
-					asp.log.Error("failed to retrieve cached traces",
-						zap.Error(err),
-						zap.String("traceID", hex.EncodeToString(id[:])),
-					)
-					asp.telemetry.
-						ProcessorAtlassianSamplingInternalErrorDroppedSpans.Add(ctx, int64(cachedData.Metadata.SpanCount))
+				cachedTraces, gtErr := cachedData.GetTraces()
+				if gtErr != nil {
+					asp.reportTraceDataErr(ctx, gtErr, int64(td.Metadata.SpanCount), zap.String(traceIDLoggingKey, hex.EncodeToString(id[:])))
 				} else {
 					asp.sendSampledTraceData(ctx, cachedTraces)
 				}
@@ -335,16 +325,9 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 			// If we have reached here, the sampling decision is still pending, so we put trace data in the cache
 			// Priority of the metadata will affect the cache tier
 			if cachedTd, ok := asp.traceData.Get(id); ok {
-				err := cachedTd.AbsorbTraceData(td) // chooses higher priority in merge
-				if err != nil {
-					asp.log.Error(
-						"failed to merge into cached traces",
-						zap.Error(err),
-						zap.String("traceID", hex.EncodeToString(id[:])),
-						zap.Int32("spanCount", td.Metadata.SpanCount),
-					)
-					asp.telemetry.ProcessorAtlassianSamplingInternalErrorDroppedSpans.
-						Add(ctx, int64(td.Metadata.SpanCount))
+				tdErr := cachedTd.AbsorbTraceData(td) // chooses higher priority in merge
+				if tdErr != nil {
+					asp.reportTraceDataErr(ctx, tdErr, int64(td.Metadata.SpanCount), zap.String(traceIDLoggingKey, hex.EncodeToString(id[:])))
 				}
 				td = cachedTd // td is now the initial, incoming td + the cached td
 			}
@@ -469,16 +452,7 @@ func (asp *atlassianSamplingProcessor) flushAll(ctx context.Context) error {
 	for i, td := range vals {
 		cachedTraces, errGetTraces := td.GetTraces()
 		if errGetTraces != nil {
-			asp.log.Error(
-				"failed to retrieve cached traces",
-				zap.Error(errGetTraces),
-				zap.Int32("spanCount", td.Metadata.SpanCount),
-			)
-			asp.telemetry.ProcessorAtlassianSamplingInternalErrorDroppedSpans.Add(
-				ctx,
-				int64(td.Metadata.SpanCount),
-			)
-
+			asp.reportTraceDataErr(ctx, errGetTraces, int64(td.Metadata.SpanCount))
 			err = multierr.Append(err, errGetTraces)
 			continue
 		}
@@ -556,4 +530,10 @@ func (asp *atlassianSamplingProcessor) onEvictNotSampled(_ pcommon.TraceID, outc
 		asp.telemetry.ProcessorAtlassianSamplingDecisionEvictionTime.
 			Record(context.Background(), time.Since(outcome.decisionTime).Seconds(), notSampledAttr)
 	}
+}
+
+func (asp *atlassianSamplingProcessor) reportTraceDataErr(ctx context.Context, err error, spanCount int64, fields ...zap.Field) {
+	fields = append(fields, zap.Error(err), zap.Int64("spanCount", spanCount))
+	asp.log.Error("failed to perform operation on TraceData", fields...)
+	asp.telemetry.ProcessorAtlassianSamplingInternalErrorDroppedSpans.Add(ctx, spanCount)
 }

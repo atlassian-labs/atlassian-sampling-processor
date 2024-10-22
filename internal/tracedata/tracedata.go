@@ -1,6 +1,7 @@
 package tracedata // import "bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 
 import (
+	"fmt"
 	"time"
 
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -57,7 +58,7 @@ func NewTraceData(arrival time.Time, traces ptrace.Traces, p priority.Priority, 
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create tracedata: %w", err)
 	}
 
 	return &TraceData{

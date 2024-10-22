@@ -1,6 +1,8 @@
 package tracedata // import "bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 
 import (
+	"fmt"
+
 	"github.com/golang/snappy"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 )
@@ -31,12 +33,12 @@ func (td *snappyTraceData) GetTraces() (ptrace.Traces, error) {
 	for _, compressed := range td.compressedBlobs {
 		decompressed, err := snappy.Decode(nil, compressed)
 		if err != nil {
-			return ptrace.NewTraces(), err
+			return ptrace.NewTraces(), fmt.Errorf("snappyTraceData: error decompressing: %w", err)
 		}
 
 		other, err := protoUnmarshal.UnmarshalTraces(decompressed)
 		if err != nil {
-			return ptrace.NewTraces(), err
+			return ptrace.NewTraces(), fmt.Errorf("snappyTraceData: error unmarshaling proto: %w", err)
 		}
 
 		other.ResourceSpans().MoveAndAppendTo(traces.ResourceSpans())
