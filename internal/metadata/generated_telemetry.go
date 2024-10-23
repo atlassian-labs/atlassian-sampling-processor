@@ -31,7 +31,6 @@ type TelemetryBuilder struct {
 	ProcessorAtlassianSamplingCacheReads                         metric.Int64Counter
 	ProcessorAtlassianSamplingChanBlockingTime                   metric.Int64Histogram
 	ProcessorAtlassianSamplingDecisionEvictionTime               metric.Float64Gauge
-	ProcessorAtlassianSamplingFlushes                            metric.Int64Counter
 	ProcessorAtlassianSamplingInternalErrorDroppedSpans          metric.Int64Counter
 	ProcessorAtlassianSamplingOverlyEagerLonelyRootSpanDecisions metric.Int64Counter
 	ProcessorAtlassianSamplingPolicyDecisions                    metric.Int64Counter
@@ -79,12 +78,6 @@ func NewTelemetryBuilder(settings component.TelemetrySettings, options ...Teleme
 		"otelcol_processor_atlassian_sampling_decision_eviction_time",
 		metric.WithDescription("Time that a trace ID spent in the decision cache before it was evicted"),
 		metric.WithUnit("s"),
-	)
-	errs = errors.Join(errs, err)
-	builder.ProcessorAtlassianSamplingFlushes, err = builder.meters[configtelemetry.LevelBasic].Int64Counter(
-		"otelcol_processor_atlassian_sampling_flushes",
-		metric.WithDescription("Number of flushes"),
-		metric.WithUnit("{flushes}"),
 	)
 	errs = errors.Join(errs, err)
 	builder.ProcessorAtlassianSamplingInternalErrorDroppedSpans, err = builder.meters[configtelemetry.LevelBasic].Int64Counter(

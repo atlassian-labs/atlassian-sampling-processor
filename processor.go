@@ -173,11 +173,14 @@ func (asp *atlassianSamplingProcessor) Start(ctx context.Context, host component
 }
 
 func (asp *atlassianSamplingProcessor) Shutdown(parentCtx context.Context) error {
+	start := time.Now()
 	if !asp.started.Load() {
 		return nil
 	}
 	asp.log.Info("shutdown of atlassianSamplingProcessor initiated")
-	defer asp.log.Info("shutdown of atlassianSamplingProcessor finished")
+	defer func() {
+		asp.log.Info("shutdown of atlassianSamplingProcessor finished", zap.Duration("shutdown.duration", time.Since(start)))
+	}()
 
 	deadline := time.Now().Add(50 * time.Second)
 	ctx, cancel := context.WithDeadline(parentCtx, deadline)
@@ -411,12 +414,6 @@ func (asp *atlassianSamplingProcessor) releaseNotSampledTrace(ctx context.Contex
 }
 
 func (asp *atlassianSamplingProcessor) flushAll(ctx context.Context) error {
-	var err error
-	defer func() {
-		asp.telemetry.ProcessorAtlassianSamplingFlushes.
-			Add(context.Background(), 1, metric.WithAttributes(attribute.Bool("success", err == nil)))
-	}()
-
 	group := &errgroup.Group{}
 	group.SetLimit(30)
 
@@ -454,11 +451,13 @@ func (asp *atlassianSamplingProcessor) flushAll(ctx context.Context) error {
 
 	// flush cached trace data
 	vals := asp.traceData.Values()
-	for i, td := range vals {
+	valsLen := len(vals)
+	tracesSent := atomic.Int64{}
+	for _, td := range vals {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("flush could not complete due to context cancellation, "+
-				"only flushed %d out of %d traces: %w", i, len(vals), context.Cause(ctx))
+			return fmt.Errorf("flush could not complete due to context cancellation. "+
+				"%d out of %d traces successffuly sent: %w", tracesSent.Load(), valsLen, context.Cause(ctx))
 		default:
 			group.Go(
 				func() error {
@@ -480,17 +479,25 @@ func (asp *atlassianSamplingProcessor) flushAll(ctx context.Context) error {
 						flushes++
 						rsAttrs.PutInt(flushCountKey, flushes)
 					}
-					return asp.next.ConsumeTraces(ctx, cachedTraces)
+					err := asp.next.ConsumeTraces(ctx, cachedTraces)
+					if err == nil {
+						tracesSent.Add(1)
+					}
+					return err
 				})
 		}
 	}
 
 	select {
 	case <-ctx.Done():
-		err = fmt.Errorf("context finished while waiting for goroutines to complete: %w", context.Cause(ctx))
-		return err
-	case err = <-groupWaiter(group):
-		return err
+		return fmt.Errorf("context finished while waiting for goroutines to complete, "+
+			"%d out of %d traces successffuly sent: %w", tracesSent.Load(), valsLen, context.Cause(ctx))
+	case err := <-groupWaiter(group):
+		if err != nil {
+			return fmt.Errorf("error waiting on errgroup, %d out of %d traces successfully sent: %w",
+				tracesSent.Load(), valsLen, err)
+		}
+		return nil
 	}
 }
 
