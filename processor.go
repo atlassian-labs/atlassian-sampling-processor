@@ -15,8 +15,8 @@ import (
 	"go.opentelemetry.io/collector/processor"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	"go.uber.org/multierr"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/cache"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/evaluators"
@@ -414,72 +414,84 @@ func (asp *atlassianSamplingProcessor) flushAll(ctx context.Context) error {
 	var err error
 	defer func() {
 		asp.telemetry.ProcessorAtlassianSamplingFlushes.
-			Add(ctx, 1,
-				metric.WithAttributes(attribute.Bool("success", err == nil)))
+			Add(context.Background(), 1, metric.WithAttributes(attribute.Bool("success", err == nil)))
 	}()
 
-	// prepare decisions spans, which are decisions encoded as spans
-	decisionTraces := ptrace.NewTraces()
-	sampledDecisionRs := decisionTraces.ResourceSpans().AppendEmpty()
-	sampledDecisionRs.Resource().Attributes().PutBool(decisionSpanKey, true)
-	sampledDecisionSpans := sampledDecisionRs.ScopeSpans().AppendEmpty().Spans()
-	sampledIDs := asp.sampledDecisionCache.Keys()
-	asp.sampledDecisionCache.Clear()
-	sampledDecisionSpans.EnsureCapacity(len(sampledIDs))
-	for _, id := range sampledIDs {
-		s := sampledDecisionSpans.AppendEmpty()
-		s.SetTraceID(id)
-		s.SetName("decision")
-	}
+	group := &errgroup.Group{}
+	group.SetLimit(30)
 
-	nonSampledDecisionRs := decisionTraces.ResourceSpans().AppendEmpty()
-	nonSampledDecisionRs.Resource().Attributes().PutBool(decisionSpanKey, false)
-	nonSampledDecisionSpans := nonSampledDecisionRs.ScopeSpans().AppendEmpty().Spans()
-	nonSampledIDs := asp.nonSampledDecisionCache.Keys()
-	asp.nonSampledDecisionCache.Clear()
-	nonSampledDecisionSpans.EnsureCapacity(len(nonSampledIDs))
-	for _, id := range nonSampledIDs {
-		s := nonSampledDecisionSpans.AppendEmpty()
-		s.SetTraceID(id)
-		s.SetName("decision")
-	}
+	// Create and export decision spans async
+	group.Go(func() error {
+		// prepare decisions spans, which are decisions encoded as spans
+		decisionTraces := ptrace.NewTraces()
+		sampledDecisionRs := decisionTraces.ResourceSpans().AppendEmpty()
+		sampledDecisionRs.Resource().Attributes().PutBool(decisionSpanKey, true)
+		sampledDecisionSpans := sampledDecisionRs.ScopeSpans().AppendEmpty().Spans()
+		sampledIDs := asp.sampledDecisionCache.Keys()
+		asp.sampledDecisionCache.Clear()
+		sampledDecisionSpans.EnsureCapacity(len(sampledIDs))
+		for _, id := range sampledIDs {
+			s := sampledDecisionSpans.AppendEmpty()
+			s.SetTraceID(id)
+			s.SetName("decision")
+		}
 
-	// flush decision spans
-	err = multierr.Append(err, asp.next.ConsumeTraces(ctx, decisionTraces))
+		nonSampledDecisionRs := decisionTraces.ResourceSpans().AppendEmpty()
+		nonSampledDecisionRs.Resource().Attributes().PutBool(decisionSpanKey, false)
+		nonSampledDecisionSpans := nonSampledDecisionRs.ScopeSpans().AppendEmpty().Spans()
+		nonSampledIDs := asp.nonSampledDecisionCache.Keys()
+		asp.nonSampledDecisionCache.Clear()
+		nonSampledDecisionSpans.EnsureCapacity(len(nonSampledIDs))
+		for _, id := range nonSampledIDs {
+			s := nonSampledDecisionSpans.AppendEmpty()
+			s.SetTraceID(id)
+			s.SetName("decision")
+		}
+
+		// flush decision spans
+		return asp.next.ConsumeTraces(ctx, decisionTraces)
+	})
 
 	// flush cached trace data
 	vals := asp.traceData.Values()
 	for i, td := range vals {
-		cachedTraces, errGetTraces := td.GetTraces()
-		if errGetTraces != nil {
-			asp.reportTraceDataErr(ctx, errGetTraces, int64(td.Metadata.SpanCount))
-			err = multierr.Append(err, errGetTraces)
-			continue
-		}
-		// Increment flush count attribute.
-		// Must be on resource attributes because routing connector only supports routing on resource attributes,
-		// and we must keep decisions spans from being batched in the same resource as actual trace data.
-		rs := cachedTraces.ResourceSpans()
-		for j := 0; j < rs.Len(); j++ {
-			var flushes int64 = 0
-			rsAttrs := rs.At(j).Resource().Attributes()
-			if v, ok := rsAttrs.Get(flushCountKey); ok {
-				flushes = v.Int()
-			}
-			flushes++
-			rsAttrs.PutInt(flushCountKey, flushes)
-		}
 		select {
 		case <-ctx.Done():
-			err = multierr.Append(err, fmt.Errorf(
-				"flush could not complete due to context cancellation, "+
-					"only flushed %d out of %d traces: %w", i, len(vals), ctx.Err()))
-			return err
+			return fmt.Errorf("flush could not complete due to context cancellation, "+
+				"only flushed %d out of %d traces: %w", i, len(vals), context.Cause(ctx))
 		default:
-			err = multierr.Append(err, asp.next.ConsumeTraces(ctx, cachedTraces))
+			group.Go(
+				func() error {
+					cachedTraces, errGetTraces := td.GetTraces()
+					if errGetTraces != nil {
+						asp.reportTraceDataErr(ctx, errGetTraces, int64(td.Metadata.SpanCount))
+						return errGetTraces
+					}
+					// Increment flush count attribute.
+					// Must be on resource attributes because routing connector only supports routing on resource attributes,
+					// and we must keep decisions spans from being batched in the same resource as actual trace data.
+					rs := cachedTraces.ResourceSpans()
+					for j := 0; j < rs.Len(); j++ {
+						var flushes int64 = 0
+						rsAttrs := rs.At(j).Resource().Attributes()
+						if v, ok := rsAttrs.Get(flushCountKey); ok {
+							flushes = v.Int()
+						}
+						flushes++
+						rsAttrs.PutInt(flushCountKey, flushes)
+					}
+					return asp.next.ConsumeTraces(ctx, cachedTraces)
+				})
 		}
 	}
-	return err
+
+	select {
+	case <-ctx.Done():
+		err = fmt.Errorf("context finished while waiting for goroutines to complete: %w", context.Cause(ctx))
+		return err
+	case err = <-groupWaiter(group):
+		return err
+	}
 }
 
 func (asp *atlassianSamplingProcessor) primaryEvictionCallback(id pcommon.TraceID, td *tracedata.TraceData) {

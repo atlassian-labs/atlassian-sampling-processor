@@ -2,6 +2,7 @@ package atlassiansamplingprocessor
 
 import (
 	"context"
+	"encoding/hex"
 	"testing"
 	"time"
 
@@ -556,48 +557,55 @@ func TestShutdown_Flushes(t *testing.T) {
 	require.NoError(t, asp.ConsumeTraces(ctx, trace))
 	assert.Equal(t, 0, sink.SpanCount())
 
-	assert.NoError(t, asp.Shutdown(context.Background()))
+	require.NoError(t, asp.Shutdown(context.Background()))
 
 	// flushAll() clears decision caches
 	assert.Equal(t, 0, len(asp.sampledDecisionCache.Keys()))
 	assert.Equal(t, 0, len(asp.nonSampledDecisionCache.Keys()))
 
 	assert.Equal(t, 4, sink.SpanCount())
-	sentData := sink.AllTraces()
-	require.Equal(t, 2, len(sentData))
-	require.Equal(t, 2, sentData[0].ResourceSpans().Len()) // sampled and non sampled rs
-	require.Equal(t, 2, sentData[1].ResourceSpans().Len()) // two actual trace data resources
+	combinedOutput := ptrace.NewTraces()
+	for _, sentTrace := range sink.AllTraces() {
+		sentTrace.ResourceSpans().MoveAndAppendTo(combinedOutput.ResourceSpans())
+	}
+	// sort resource spans slice so it's always in same order
+	// use the trace ID of the first span to determine sort order
+	combinedOutput.ResourceSpans().Sort(func(a, b ptrace.ResourceSpans) bool {
+		aID := a.ScopeSpans().At(0).Spans().At(0).TraceID()
+		bID := b.ScopeSpans().At(0).Spans().At(0).TraceID()
+		return hex.EncodeToString(aID[:]) < hex.EncodeToString(bID[:])
+	})
+	require.Equal(t, 4, combinedOutput.ResourceSpans().Len()) // 2x sampled, 2x non-sampled RS
+
+	// First tracedata resource (didn't initially have any flushes set)
+	v, ok := combinedOutput.ResourceSpans().At(0).Resource().Attributes().Get(flushCountKey)
+	require.True(t, ok)
+	flushes := v.Int()
+	assert.Equal(t, int64(1), flushes)
+
+	// Second tracedata resource (had incoming flush count of 5)
+	v, ok = combinedOutput.ResourceSpans().At(1).Resource().Attributes().Get(flushCountKey)
+	require.True(t, ok)
+	flushes = v.Int()
+	assert.Equal(t, int64(6), flushes)
 
 	// sampled decision span
-	sdSpan := sentData[0].ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0)
-	resAttrs := sentData[0].ResourceSpans().At(0).Resource().Attributes()
-	v, ok := resAttrs.Get(decisionSpanKey)
+	sdSpan := combinedOutput.ResourceSpans().At(2).ScopeSpans().At(0).Spans().At(0)
+	resAttrs := combinedOutput.ResourceSpans().At(2).Resource().Attributes()
+	v, ok = resAttrs.Get(decisionSpanKey)
 	assert.True(t, ok)
 	assert.True(t, v.Bool())
 	assert.Equal(t, "decision", sdSpan.Name())
 	assert.Equal(t, testTraceID2, sdSpan.TraceID())
 
 	// non-sampled decision span
-	nsdSpan := sentData[0].ResourceSpans().At(1).ScopeSpans().At(0).Spans().At(0)
-	resAttrs = sentData[0].ResourceSpans().At(1).Resource().Attributes()
+	nsdSpan := combinedOutput.ResourceSpans().At(3).ScopeSpans().At(0).Spans().At(0)
+	resAttrs = combinedOutput.ResourceSpans().At(3).Resource().Attributes()
 	v, ok = resAttrs.Get(decisionSpanKey)
 	assert.True(t, ok)
 	assert.False(t, v.Bool())
 	assert.Equal(t, "decision", nsdSpan.Name())
 	assert.Equal(t, testTraceID3, nsdSpan.TraceID())
-
-	// First tracedata resource (didn't initially have any flushes set)
-	v, ok = sentData[1].ResourceSpans().At(0).Resource().Attributes().Get(flushCountKey)
-	require.True(t, ok)
-	flushes := v.Int()
-	assert.Equal(t, int64(1), flushes)
-
-	// Second tracedata resource (had incoming flush count of 5)
-	v, ok = sentData[1].ResourceSpans().At(1).Resource().Attributes().Get(flushCountKey)
-	require.True(t, ok)
-	flushes = v.Int()
-	assert.Equal(t, int64(6), flushes)
-
 }
 
 func TestShutdown_TimesOut(t *testing.T) {
@@ -868,8 +876,8 @@ func TestConsumeTraces_Basic_Compression(t *testing.T) {
 	sink := &consumertest.TracesSink{}
 
 	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
-	assert.True(t, asp.compress)
 	require.NoError(t, err)
+	assert.True(t, asp.compress)
 
 	decider := &mockDecider{}
 	asp.decider = decider
