@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
 
+	"bitbucket.org/atlassian/observability-sidecar/internal/ptraceutil"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl"
@@ -71,58 +72,50 @@ func NewOTTLConditionEvaluator(spanConditions, spanEventConditions []string, err
 	return filter, nil
 }
 
-func (oce *ottlConditionEvaluator) Evaluate(ctx context.Context, traceID pcommon.TraceID, currentTrace ptrace.Traces, _ *tracedata.Metadata) (Decision, error) {
+func (oce *ottlConditionEvaluator) Evaluate(ctx context.Context, _ pcommon.TraceID, currentTrace ptrace.Traces, _ *tracedata.Metadata) (Decision, error) {
 	if oce.sampleSpanExpr == nil && oce.sampleSpanEventExpr == nil {
 		return Pending, nil
 	}
 
-	for i := 0; i < currentTrace.ResourceSpans().Len(); i++ {
-		rs := currentTrace.ResourceSpans().At(i)
-		resource := rs.Resource()
-		for j := 0; j < rs.ScopeSpans().Len(); j++ {
-			ss := rs.ScopeSpans().At(j)
-			scope := ss.Scope()
-			for k := 0; k < ss.Spans().Len(); k++ {
-				span := ss.Spans().At(k)
+	for item := range ptraceutil.TraceIterator(currentTrace) {
+		rs, ss, span := item.ResourceSpans, item.ScopeSpans, item.Span
+		var (
+			ok  bool
+			err error
+		)
 
-				var (
-					ok  bool
-					err error
-				)
+		// Now we reach span level and begin evaluation with parsed expr.
+		// The evaluation will break when:
+		// 1. error happened.
+		// 2. "Sampled" decision made.
+		// Otherwise, it will keep evaluating and finally exit with "Pending" decision.
 
-				// Now we reach span level and begin evaluation with parsed expr.
-				// The evaluation will break when:
-				// 1. error happened.
-				// 2. "Sampled" decision made.
-				// Otherwise, it will keep evaluating and finally exit with "Pending" decision.
+		// Span evaluation
+		if oce.sampleSpanExpr != nil {
+			ok, err = oce.sampleSpanExpr.Eval(ctx, ottlspan.NewTransformContext(span, ss.Scope(), rs.Resource(), ss, rs))
+			if err != nil {
+				return Pending, err
+			}
+			if ok {
+				return Sampled, nil
+			}
+		}
 
-				// Span evaluation
-				if oce.sampleSpanExpr != nil {
-					ok, err = oce.sampleSpanExpr.Eval(ctx, ottlspan.NewTransformContext(span, scope, resource, ss, rs))
-					if err != nil {
-						return Pending, err
-					}
-					if ok {
-						return Sampled, nil
-					}
+		// Span event evaluation
+		if oce.sampleSpanEventExpr != nil {
+			spanEvents := span.Events()
+			for l := 0; l < spanEvents.Len(); l++ {
+				ok, err = oce.sampleSpanEventExpr.Eval(ctx, ottlspanevent.NewTransformContext(spanEvents.At(l), span, ss.Scope(), rs.Resource(), ss, rs))
+				if err != nil {
+					return Pending, err
 				}
-
-				// Span event evaluation
-				if oce.sampleSpanEventExpr != nil {
-					spanEvents := span.Events()
-					for l := 0; l < spanEvents.Len(); l++ {
-						ok, err = oce.sampleSpanEventExpr.Eval(ctx, ottlspanevent.NewTransformContext(spanEvents.At(l), span, scope, resource, ss, rs))
-						if err != nil {
-							return Pending, err
-						}
-						if ok {
-							return Sampled, nil
-						}
-					}
+				if ok {
+					return Sampled, nil
 				}
 			}
 		}
 	}
+
 	return Pending, nil
 }
 

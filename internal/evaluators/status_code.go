@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 
+	"bitbucket.org/atlassian/observability-sidecar/internal/ptraceutil"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 )
 
@@ -53,21 +54,10 @@ func NewStatusCodeEvaluator(statusCodeString []string) (PolicyEvaluator, error) 
 
 // Evaluate looks at the trace data and returns a corresponding SamplingDecision.
 func (sce *statusCodeEvaluator) Evaluate(_ context.Context, _ pcommon.TraceID, currentTrace ptrace.Traces, mergedMetadata *tracedata.Metadata) (Decision, error) {
-	for i := 0; i < currentTrace.ResourceSpans().Len(); i++ {
-		rs := currentTrace.ResourceSpans().At(i)
-		ilss := rs.ScopeSpans()
-
-		for j := 0; j < ilss.Len(); j++ {
-			ils := ilss.At(j)
-
-			for k := 0; k < ils.Spans().Len(); k++ {
-				span := ils.Spans().At(k)
-
-				for _, statusCode := range sce.statusCodes {
-					if span.Status().Code() == statusCode {
-						return Sampled, nil
-					}
-				}
+	for item := range ptraceutil.TraceIterator(currentTrace) {
+		for _, statusCode := range sce.statusCodes {
+			if item.Span.Status().Code() == statusCode {
+				return Sampled, nil
 			}
 		}
 	}

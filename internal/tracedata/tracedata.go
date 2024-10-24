@@ -6,6 +6,7 @@ import (
 
 	"go.opentelemetry.io/collector/pdata/ptrace"
 
+	"bitbucket.org/atlassian/observability-sidecar/internal/ptraceutil"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/priority"
 )
 
@@ -28,23 +29,16 @@ func NewTraceData(arrival time.Time, traces ptrace.Traces, p priority.Priority, 
 	}
 
 	// Calculate earliest start and latest end
-	rss := traces.ResourceSpans()
-	for i := 0; i < rss.Len(); i++ {
-		rs := rss.At(i)
-		ilss := rs.ScopeSpans()
-		for j := 0; j < ilss.Len(); j++ {
-			ss := ilss.At(j).Spans()
-			for k := 0; k < ss.Len(); k++ {
-				start := ss.At(k).StartTimestamp()
-				end := ss.At(k).EndTimestamp()
+	for item := range ptraceutil.TraceIterator(traces) {
+		span := item.Span
+		start := span.StartTimestamp()
+		end := span.EndTimestamp()
 
-				if start < metadata.EarliestStartTime || metadata.EarliestStartTime == 0 {
-					metadata.EarliestStartTime = start
-				}
-				if end > metadata.LatestEndTime {
-					metadata.LatestEndTime = end
-				}
-			}
+		if start < metadata.EarliestStartTime || metadata.EarliestStartTime == 0 {
+			metadata.EarliestStartTime = start
+		}
+		if end > metadata.LatestEndTime {
+			metadata.LatestEndTime = end
 		}
 	}
 

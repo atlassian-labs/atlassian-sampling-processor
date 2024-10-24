@@ -8,6 +8,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 
+	"bitbucket.org/atlassian/observability-sidecar/internal/ptraceutil"
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 )
 
@@ -32,20 +33,14 @@ func NewThresholdEvaluator() PolicyEvaluator {
 // value with the right 56-bits (7 bytes) of the trace ID.
 func (t *thresholdEvaluator) Evaluate(_ context.Context, id pcommon.TraceID, currentTrace ptrace.Traces, _ *tracedata.Metadata) (Decision, error) {
 	minThreshold := maxThreshold
-	for i := 0; i < currentTrace.ResourceSpans().Len(); i++ {
-		rs := currentTrace.ResourceSpans().At(i)
-		for j := 0; j < rs.ScopeSpans().Len(); j++ {
-			ss := rs.ScopeSpans().At(j)
-			for k := 0; k < ss.Spans().Len(); k++ {
-				span := ss.Spans().At(k)
-				threshold, ok := getThreshold(span)
-				if !ok {
-					continue
-				}
-				if threshold < minThreshold {
-					minThreshold = threshold
-				}
-			}
+	for item := range ptraceutil.TraceIterator(currentTrace) {
+		span := item.Span
+		threshold, ok := getThreshold(span)
+		if !ok {
+			continue
+		}
+		if threshold < minThreshold {
+			minThreshold = threshold
 		}
 	}
 
