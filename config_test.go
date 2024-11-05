@@ -170,21 +170,123 @@ func TestLoadConfig(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	testCases := []struct {
-		PrimaryCacheSize   int
-		SecondaryCacheSize int
-		hasError           bool
+		name          string
+		c             *Config
+		expectedError error
 	}{
-		{100, 10, false},
-		{0, 10, true},
-		{10, 0, true},
-		{100, 50, false},
-		{100, 55, true},
+		{
+			name: "Primary cache 100, secondary cache 10",
+			c: &Config{
+				PrimaryCacheSize:   100,
+				SecondaryCacheSize: 10,
+				PolicyConfig:       make([]PolicyConfig, 0),
+			},
+			expectedError: nil,
+		},
+		{
+			name: "Primary cache 0, secondary cache 10",
+			c: &Config{
+				PrimaryCacheSize:   0,
+				SecondaryCacheSize: 10,
+				PolicyConfig:       make([]PolicyConfig, 0),
+			},
+			expectedError: primaryCacheSizeError,
+		},
+		{
+			name: "Primary cache 10, secondary cache 0",
+			c: &Config{
+				PrimaryCacheSize:   10,
+				SecondaryCacheSize: 0,
+				PolicyConfig:       make([]PolicyConfig, 0),
+			},
+			expectedError: secondaryCacheSizeError,
+		},
+		{
+			name: "Primary cache 100, secondary cache 50",
+			c: &Config{
+				PrimaryCacheSize:   100,
+				SecondaryCacheSize: 50,
+				PolicyConfig:       make([]PolicyConfig, 0),
+			},
+			expectedError: nil,
+		},
+		{
+			name: "Primary cache 100, secondary cache 55",
+			c: &Config{
+				PrimaryCacheSize:   100,
+				SecondaryCacheSize: 55,
+				PolicyConfig:       make([]PolicyConfig, 0),
+			},
+			expectedError: secondaryCacheSizeError,
+		},
+		{
+			name: "No duplicate policy names",
+			c: &Config{
+				PrimaryCacheSize:   100,
+				SecondaryCacheSize: 10,
+				PolicyConfig: []PolicyConfig{
+					{
+						SharedPolicyConfig: SharedPolicyConfig{
+							Name: "test-policy-1",
+							Type: Probabilistic,
+							ProbabilisticConfig: ProbabilisticConfig{
+								HashSalt:           "test-hash",
+								SamplingPercentage: 0,
+							},
+						},
+					},
+					{
+						SharedPolicyConfig: SharedPolicyConfig{
+							Name: "test-policy-2",
+							Type: Probabilistic,
+							ProbabilisticConfig: ProbabilisticConfig{
+								HashSalt:           "test-hash",
+								SamplingPercentage: 0,
+							},
+						},
+					},
+				},
+			},
+			expectedError: nil,
+		}, {
+			name: "Duplicate policy names",
+			c: &Config{
+				PrimaryCacheSize:   100,
+				SecondaryCacheSize: 10,
+				PolicyConfig: []PolicyConfig{
+					{
+						SharedPolicyConfig: SharedPolicyConfig{
+							Name: "test-policy-1",
+							Type: Probabilistic,
+							ProbabilisticConfig: ProbabilisticConfig{
+								HashSalt:           "test-hash",
+								SamplingPercentage: 0,
+							},
+						},
+					},
+					{
+						SharedPolicyConfig: SharedPolicyConfig{
+							Name: "test-policy-1",
+							Type: Probabilistic,
+							ProbabilisticConfig: ProbabilisticConfig{
+								HashSalt:           "test-hash",
+								SamplingPercentage: 0,
+							},
+						},
+					},
+				},
+			},
+			expectedError: duplicatePolicyName,
+		},
 	}
-	cfg := createDefaultConfig().(*Config)
-
 	for _, tc := range testCases {
-		cfg.PrimaryCacheSize = tc.PrimaryCacheSize
-		cfg.SecondaryCacheSize = tc.SecondaryCacheSize
-		assert.Equal(t, tc.hasError, cfg.Validate() != nil)
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.c.Validate()
+			if tc.expectedError == nil {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err, tc.expectedError)
+			}
+		})
 	}
 }

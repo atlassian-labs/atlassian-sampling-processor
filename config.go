@@ -36,6 +36,7 @@ type Config struct {
 var (
 	primaryCacheSizeError   = errors.New("primary_cache_size must be greater than 0")
 	secondaryCacheSizeError = errors.New("secondary_cache_size must be greater than 0 and less than 50% of primary_cache_size")
+	duplicatePolicyName     = errors.New("duplicate policy names found in sampling policy config")
 )
 
 var _ component.Config = (*Config)(nil)
@@ -74,5 +75,21 @@ func (cfg *Config) Validate() (errors error) {
 		errors = multierr.Append(errors, secondaryCacheSizeError)
 	}
 
+	err := validateUniquePolicyNames(cfg.PolicyConfig)
+	if err != nil {
+		errors = multierr.Append(errors, err)
+	}
+
 	return errors
+}
+
+func validateUniquePolicyNames(policies []PolicyConfig) error {
+	policyNames := make(map[string]bool)
+	for _, policy := range policies {
+		if _, exists := policyNames[policy.Name]; exists {
+			return duplicatePolicyName
+		}
+		policyNames[policy.Name] = true
+	}
+	return nil
 }
