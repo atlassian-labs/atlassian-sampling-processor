@@ -15,6 +15,10 @@ collector's tail sampler (or even Refinery).
 It's called the "Atlassian Sampling Processor", but please refrain from writing any atlassian-specific code, 
 as there is a good chance this component will be open sourced.
 
+## Detailed Documentation and Design Rationale
+
+Detailed design documentation for this processor can be found in [DESIGN.md](./DESIGN.md).
+
 ## Config 
 
 ### `primary_cache_size`
@@ -100,6 +104,9 @@ Current supported policy types are:
 - `status_code` - samples based upon the status code (OK, ERROR or UNSET)
 - `ottl_condition` - samples based on given boolean OTTL condition (span and span event).
 - `downgrader` - downgrades any "Sampled" decision from the `sub_policy`, to what is specified in `downgrade_to`. 
+- `threshold` - inspects span attribute `sampling.tail.threshold`, and makes a Sampled decision if the numerical value of the attribute
+  is larger than the rightmost 56-bits of the trace ID. The attribute takes the string form "0x[0-9a-fA-F]{1,14}". If the numerical part 
+  of the attribute is less than 14 digits (56-bits) long, it will be right-padded with zeroes as per OTEP-235.
 
 ### Example
 
