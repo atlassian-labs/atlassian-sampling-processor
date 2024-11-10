@@ -26,14 +26,19 @@ import (
 	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 )
 
-const flushCountKey = "atlassiansampling.flushes"
-const decisionSpanKey = "atlassiansampling.decision"
-const memTickerInterval = 10 * time.Second
-const traceIDLoggingKey = "traceId"
+const (
+	flushCountKey     = "atlassiansampling.flushes"
+	decisionSpanKey   = "atlassiansampling.decision"
+	memTickerInterval = 10 * time.Second
+	traceIDLoggingKey = "traceId"
+)
 
 var (
 	sampledAttr    = metric.WithAttributes(attribute.String("decision", "sampled"))
 	notSampledAttr = metric.WithAttributes(attribute.String("decision", "not_sampled"))
+	evictionAttrs  = metric.WithAttributes(
+		attribute.String("policy", "evicted"),
+		attribute.String("decision", evaluators.NotSampled.String()))
 )
 
 type atlassianSamplingProcessor struct {
@@ -50,7 +55,7 @@ type atlassianSamplingProcessor struct {
 	sampledDecisionCache cache.Cache[time.Time]
 	// nonSampledDecisionCache holds the set of trace IDs that were not sampled, and a struct that contains the policy that
 	// made the not sampled decision and the time the decision was made
-	nonSampledDecisionCache cache.Cache[*nsdOutcome]
+	nonSampledDecisionCache cache.Cache[time.Time]
 	// incomingTraces is where the traces are put when they first arrive to the component
 	incomingTraces chan ptrace.Traces
 	// memRegulator can adjust cache sizes to target a given heap usage.
@@ -68,10 +73,6 @@ type atlassianSamplingProcessor struct {
 }
 
 var _ processor.Traces = (*atlassianSamplingProcessor)(nil)
-
-type nsdOutcome struct {
-	decisionTime time.Time
-}
 
 func newAtlassianSamplingProcessor(cCfg component.Config, set component.TelemetrySettings, next consumer.Traces) (*atlassianSamplingProcessor, error) {
 	cfg, ok := cCfg.(*Config)
@@ -126,7 +127,7 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 	if err != nil {
 		return nil, err
 	}
-	asp.nonSampledDecisionCache, err = cache.NewLRUCache[*nsdOutcome](cfg.NonSampledCacheSize, asp.onEvictNotSampled, telemetry)
+	asp.nonSampledDecisionCache, err = cache.NewLRUCache[time.Time](cfg.NonSampledCacheSize, asp.onEvictNotSampled, telemetry)
 	if err != nil {
 		return nil, err
 	}
@@ -406,10 +407,8 @@ func (asp *atlassianSamplingProcessor) sendSampledTraceData(ctx context.Context,
 // releaseNotSampledTrace removes references to traces that have been decided to be not sampled.
 // It also caches the non sampled decision, and increments count of traces not sampled.
 func (asp *atlassianSamplingProcessor) releaseNotSampledTrace(ctx context.Context, id pcommon.TraceID) {
+	asp.nonSampledDecisionCache.Put(id, time.Now())
 	asp.traceData.Delete(id)
-	asp.nonSampledDecisionCache.Put(id, &nsdOutcome{
-		decisionTime: time.Now(),
-	})
 	asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
 }
 
@@ -515,17 +514,15 @@ func (asp *atlassianSamplingProcessor) secondaryEvictionCallback(id pcommon.Trac
 
 func (asp *atlassianSamplingProcessor) cacheEvictionCallback(cacheName string, id pcommon.TraceID, td *tracedata.TraceData) {
 	ctx := context.Background()
-	// Check that we didn't actually sample this trace
+	// Check decision caches
 	_, sampled := asp.sampledDecisionCache.Get(id)
+	_, notSampled := asp.nonSampledDecisionCache.Get(id)
 
-	if !sampled {
-		asp.releaseNotSampledTrace(ctx, id)
-		asp.telemetry.ProcessorAtlassianSamplingPolicyDecisions.Add(ctx, 1,
-			metric.WithAttributes(
-				attribute.String("policy", "evicted"),
-				attribute.String("decision", evaluators.NotSampled.String()),
-				attribute.String("cache", cacheName),
-			))
+	// If decision does not exist in the cache, this is not an explicit deletion, but a natural eviction
+	if !sampled && !notSampled {
+		asp.nonSampledDecisionCache.Put(id, time.Now())
+		asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
+		asp.telemetry.ProcessorAtlassianSamplingPolicyDecisions.Add(ctx, 1, evictionAttrs)
 
 		// Only record eviction time when it was a trace that was not sampled, to avoid
 		// metrics being polluted with explicit cache deletions from traces being sampled and exported.
@@ -543,11 +540,11 @@ func (asp *atlassianSamplingProcessor) onEvictSampled(_ pcommon.TraceID, insertT
 	}
 }
 
-func (asp *atlassianSamplingProcessor) onEvictNotSampled(_ pcommon.TraceID, outcome *nsdOutcome) {
+func (asp *atlassianSamplingProcessor) onEvictNotSampled(_ pcommon.TraceID, decisionTime time.Time) {
 	if asp.started.Load() {
 		// only record eviction time if processor is running / not shutting down
 		asp.telemetry.ProcessorAtlassianSamplingDecisionEvictionTime.
-			Record(context.Background(), time.Since(outcome.decisionTime).Seconds(), notSampledAttr)
+			Record(context.Background(), time.Since(decisionTime).Seconds(), notSampledAttr)
 	}
 }
 

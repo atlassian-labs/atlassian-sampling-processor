@@ -471,7 +471,7 @@ func TestConsumeTraces_DecisionSpanArrival(t *testing.T) {
 
 	// populate decision caches
 	asp.sampledDecisionCache.Put(testTraceID, time.Now())
-	asp.nonSampledDecisionCache.Put(testTraceID2, &nsdOutcome{decisionTime: time.Now()})
+	asp.nonSampledDecisionCache.Put(testTraceID2, time.Now())
 
 	// populate trace data cache
 	trace := ptrace.NewTraces()
@@ -542,7 +542,7 @@ func TestShutdown_Flushes(t *testing.T) {
 
 	// populate decision caches, these should appear as decision spans
 	asp.sampledDecisionCache.Put(testTraceID2, time.Now())
-	asp.nonSampledDecisionCache.Put(testTraceID3, &nsdOutcome{decisionTime: time.Now()})
+	asp.nonSampledDecisionCache.Put(testTraceID3, time.Now())
 
 	// One trace, two ResourceSpans, one with the flushes attr already set
 	trace := ptrace.NewTraces()
