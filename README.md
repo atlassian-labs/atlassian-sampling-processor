@@ -4,6 +4,7 @@ This is a tail sampling processor. Some of the code is copied and modified from 
 [tailsamplingprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor). 
 
 This processor exists because: 
+
 - The upstream tail sampler has very high memory usage, and does very little to mitigate this.
 - The upstream tail sampler has slow decision-making as it tries to gather all spans of a trace before making a decision.
 - The upstream tail sampler has no way of prioritising one sampling policy over another.
@@ -91,6 +92,7 @@ used as the final decision.
 Policies include a `name`, `type`, and then further configuration depending on what the `type` was.
 
 Current supported policy types are: 
+
 - `span_count` - samples the trace if it meets a minimum amount of spans. 
 - `probabilistic` - evaluates the hash of the trace ID to a configured percentage.
 - `remote_probabilistic` - fetches sampling rates using the specified rate getter at runtime and samples traces

@@ -81,6 +81,7 @@ The contrib's tail sampler is designed to collect spans in memory and wait for a
 with the assumption that all spans from a given trace will be collected in-memory after the decision wait time elapses.
 
 This approach presented several challenges for us:
+
 * A significant portion of our data is "garbage" that could be discarded sooner. For instance, "lonely" root spans often have a high probability of being irrelevant.
 * Many of our critical traces arrive over a duration exceeding 30 to 60 seconds, making the "decision time" awkward.
 * There is no mechanism to differentiate between "important" and "garbage" data, resulting in all traces being retained in memory for a minimum duration.
