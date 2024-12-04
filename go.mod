@@ -1,6 +1,6 @@
 module bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor
 
-go 1.23.2
+go 1.23.4
 
 require (
 	bitbucket.org/atlassian/observability-sidecar/internal/ptraceutil v0.0.0-00010101000000-000000000000
