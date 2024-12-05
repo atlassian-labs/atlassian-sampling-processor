@@ -12,7 +12,6 @@ import (
 	"go.opentelemetry.io/collector/config/configtelemetry"
 	"go.opentelemetry.io/collector/processor"
 	"go.opentelemetry.io/collector/processor/processortest"
-	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata/metricdatatest"
@@ -25,17 +24,15 @@ type componentTestTelemetry struct {
 
 func (tt *componentTestTelemetry) NewSettings() processor.Settings {
 	set := processortest.NewNopSettings()
-	set.TelemetrySettings = tt.newTelemetrySettings()
 	set.ID = component.NewID(component.MustNewType("atlassian_sampling"))
+	set.TelemetrySettings = tt.newTelemetrySettings()
 	return set
 }
 
 func (tt *componentTestTelemetry) newTelemetrySettings() component.TelemetrySettings {
 	set := componenttest.NewNopTelemetrySettings()
 	set.MeterProvider = tt.meterProvider
-	set.LeveledMeterProvider = func(_ configtelemetry.Level) metric.MeterProvider {
-		return tt.meterProvider
-	}
+	set.MetricsLevel = configtelemetry.LevelDetailed
 	return set
 }
 

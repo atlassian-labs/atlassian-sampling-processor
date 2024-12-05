@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componenttest"
-	"go.opentelemetry.io/collector/config/configtelemetry"
 	"go.opentelemetry.io/otel/metric"
 	embeddedmetric "go.opentelemetry.io/otel/metric/embedded"
 	noopmetric "go.opentelemetry.io/otel/metric/noop"
@@ -44,9 +43,6 @@ func (m mockTracerProvider) Tracer(name string, opts ...trace.TracerOption) trac
 
 func TestProviders(t *testing.T) {
 	set := component.TelemetrySettings{
-		LeveledMeterProvider: func(_ configtelemetry.Level) metric.MeterProvider {
-			return mockMeterProvider{}
-		},
 		MeterProvider:  mockMeterProvider{},
 		TracerProvider: mockTracerProvider{},
 	}
