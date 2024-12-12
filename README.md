@@ -12,7 +12,7 @@ More info on the design choices can be found in [DESIGN.md](./pkg/processor/atla
 We made these optimisations to dramatically reduce our tail sampling compute cost. 
 
 The commits under `/pkg` are synced from a closed source monorepo. Most of the development is done closed source and then synced here.
-That being said, we still accept contributions that we can later sync back to our upstream version.
+That being said, we still accept contributions that we can later sync back to our upstream version. Also see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Contributors
 
