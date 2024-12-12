@@ -1,24 +1,36 @@
 # Atlassian Sampling Processor
 
-This is a tail sampling processor. Some of the code is copied and modified from the upstream collector's
-[tailsamplingprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor). 
+This is a tail sampling processor. Small parts of the code are copied and modified from the collector's
+[tailsamplingprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor).
 
-This processor exists because: 
+## Open Source
 
-- The upstream tail sampler has very high memory usage, and does very little to mitigate this.
-- The upstream tail sampler has slow decision-making as it tries to gather all spans of a trace before making a decision.
-- The upstream tail sampler has no way of prioritising one sampling policy over another.
-- The upstream tail sampler lacks features that we want to develop (e.g. support for scaling, ability to look at root spans)
+This component is open source, however the source of truth is the closed source version. The open source version
+is periodically synced with closed source version. External contributors are still welcome.
 
-So, the overall goal is to be a tail sampler that is more performant, reliable and feature-rich than the upstream
-collector's tail sampler (or even Refinery).
-
-It's called the "Atlassian Sampling Processor", but please refrain from writing any atlassian-specific code, 
-as there is a good chance this component will be open sourced.
+Any code which cannot be consumed by the wider community, being atlassian specific, will be rejected.
 
 ## Detailed Documentation and Design Rationale
 
 Detailed design documentation for this processor can be found in [DESIGN.md](./DESIGN.md).
+
+## Contrasting to Collector Contrib's tail sampling processor
+
+This processor takes quite a different approach to the collector-contrib's tail sampling processor. 
+Some key differences are noted here.
+
+- Makes quick decisions when possible (doesn't wait a specified time period to make a decision on a trace). This is possible 
+  via mandatory decision caches, so when subsequent spans arrive the correct decision is made on them. Additionally,
+  it allows us to identify "garbage" quickly and occasionally take a hardline "not sampled" stance before the whole trace arrives.
+  For example, a root span with no other spans in the trace can be dropped immediately instead of waiting. These can also be marked as "low priority"
+  and put in the secondary cache which is evicted more quickly (see below for more).
+- Policy evaluations follow a strict order, and the first definitive decision is used. This allows one policy to take priority over another.
+  Does not have concept of "inverting" a decision, but does have a policy that can downgrade a "Sampled" decision to another decision.
+- Supports horizontal scaling. Can flush it's cached data on shutdown.
+- Can optionally compress spans in-memory, saving memory at the cost of processing time and CPU usage.
+- Optionally variable cache size. Num traces kept in memory can automatically self-adjust if heap usage exceeds target.
+  Keeps memory usage constant and squeezes most memory possible out of resource.
+- Allows remote sampling percentage configuration, via an optional extension that implement a RateGetter interface. The extension is not provided in open source.
 
 ## Config 
 
@@ -96,7 +108,8 @@ Current supported policy types are:
 - `span_count` - samples the trace if it meets a minimum amount of spans. 
 - `probabilistic` - evaluates the hash of the trace ID to a configured percentage.
 - `remote_probabilistic` - fetches sampling rates using the specified rate getter at runtime and samples traces
-  based on the fetched sampling rate. 
+  based on the fetched sampling rate. The RateGetter interface can be implemented by a custom extension, and the ID 
+  of the component can be provided in the configuration.
 - `and` - combines any number of sampling policies together.
 - `root_spans` - specifies a sub-policy to only operate on lone-root-spans, but eagerly converts the sub-policy "pending"
   decisions into "not sampled" decisions. A span considered to be "lone" if there is no other spans present for the same
