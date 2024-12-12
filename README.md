@@ -24,3 +24,10 @@ A big thank you to all contributors who have made this repository possible throu
 * [David Li](https://github.com/davidlee88)
 * [Jordan Bertasso](https://github.com/jordanbertasso)
 * Michael Yoo
+
+## License
+
+Apache-2.0 License. See [LICENSE](./LICENSE).
+
+Copyright 2024 Atlassian US, Inc.
+Copyright 2024 Atlassian Pty Ltd.
