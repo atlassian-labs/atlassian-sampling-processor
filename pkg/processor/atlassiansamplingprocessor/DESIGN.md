@@ -2,7 +2,7 @@
 
 This document describes detailed rationale behind the decision we made while developing this processor.
 
-It also contains information about how to run in a production environment, including a video demo of the metrics emitted.
+It also contains information about how to run in a production environment.
 
 ## High Level Path
 
@@ -171,9 +171,4 @@ to preserve the rough existing order. Data that's older will arrive first and so
 
 ## Metrics 
 
-All metrics emitted by this processor are documented in `documentation.md`. 
-
-Below is a Loom video which takes you through the production SFx dashboard of the tail sampler.
-It takes you through the metrics, what they mean, and how they relate to each other.
-
-[Link to Loom Video](https://www.loom.com/share/f3fc64f4ec1f44d2b225aac6df6cb530?sid=47b7cca3-74c0-464c-9556-a49a339898ba).
+All metrics emitted by this processor are documented in `documentation.md`.
