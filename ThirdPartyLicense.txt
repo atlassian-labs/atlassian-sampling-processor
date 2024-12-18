@@ -1,0 +1,152 @@
+Participle (https://github.com/alecthomas/participle)
+Copyright (c) Alec Thomas
+License: MIT (https://github.com/alecthomas/participle/blob/main/LICENSE)
+
+XMLQuery (https://github.com/antchfx/xmlquery)
+Copyright (c) Antchfx
+License: MIT (https://github.com/antchfx/xmlquery/blob/master/LICENSE)
+
+XPath (https://github.com/antchfx/xpath)
+Copyright (c) Antchfx
+License: MIT (https://github.com/antchfx/xpath/blob/master/LICENSE)
+
+XXHash (https://github.com/cespare/xxhash)
+Copyright (c) 2016 Caleb Spare
+License: MIT (https://github.com/cespare/xxhash/blob/master/LICENSE.txt)
+
+Go-Spew (https://github.com/davecgh/go-spew)
+Copyright (c) 2012-2016 Dave Collins <dave@davec.name>
+License: ISC (https://github.com/davecgh/go-spew/blob/master/LICENSE)
+
+Go-Grok (https://github.com/elastic/go-grok)
+Copyright (c) Elasticsearch B.V.
+License: Apache 2.0 (https://github.com/elastic/go-grok/blob/main/LICENSE)
+
+Lunes (https://github.com/elastic/lunes)
+Copyright (c) Elasticsearch B.V.
+License: Apache 2.0 (https://github.com/elastic/lunes/blob/main/LICENSE)
+
+Logr (https://github.com/go-logr/logr)
+Copyright 2021 The logr Authors.
+License: Apache 2.0 (https://github.com/go-logr/logr/blob/master/LICENSE)
+
+Stdr (https://github.com/go-logr/stdr)
+Copyright 2021 The logr Authors.
+License: Apache 2.0 (https://github.com/go-logr/stdr/blob/master/LICENSE)
+
+Mapstructure (https://github.com/go-viper/mapstructure)
+Copyright (c) 2013 Mitchell Hashimoto
+License: MIT (https://github.com/go-viper/mapstructure/blob/master/LICENSE)
+
+Glob (https://github.com/gobwas/glob)
+Copyright (c) 2016 Sergey Kamardin
+License: MIT (https://github.com/gobwas/glob/blob/master/LICENSE)
+
+Go-JSON (https://github.com/goccy/go-json)
+Copyright (c) 2020 Masaaki Goshima
+License: Apache 2.0 (https://github.com/goccy/go-json/master/LICENSE)
+
+Gogo Protobuf (https://github.com/gogo/protobuf)
+Copyright (c) 2013, The GoGo Authors.
+License: BSD 3-Clause (https://github.com/gogo/protobuf/blob/master/LICENSE)
+
+Groupcache (https://github.com/golang/groupcache)
+Copyright 2013 Google Inc.
+License: Apache 2.0 (https://github.com/golang/groupcache/blob/master/LICENSE)
+
+UUID (https://github.com/google/uuid)
+Copyright (c) 2009,2014 Google Inc. All rights reserved.
+License: BSD 3-Clause (https://github.com/google/uuid/blob/master/LICENSE)
+
+Golang-LRU (https://github.com/hashicorp/golang-lru)
+Copyright (c) 2014 HashiCorp, Inc.
+License: MPL 2.0 (https://github.com/hashicorp/golang-lru/blob/main/LICENSE)
+
+Strcase (https://github.com/iancoleman/strcase)
+Copyright (c) 2015 Ian Coleman
+Copyright (c) 2018 Ma_124, <github.com/Ma124>
+License: MIT (https://github.com/iancoleman/strcase/blob/master/LICENSE)
+
+Json-Iterator (https://github.com/json-iterator/go)
+Copyright (c) 2016 json-iterator
+License: MIT (https://github.com/json-iterator/go/blob/master/LICENSE)
+
+Koanf (https://github.com/knadh/koanf)
+Copyright (c) 2019, Kailash Nadh. https://github.com/knadh
+License: MIT (https://github.com/knadh/koanf/blob/master/LICENSE)
+
+Mage (https://github.com/magefile/mage)
+Copyright 2017 the Mage authors
+License: Apache 2.0 (https://github.com/magefile/mage/blob/master/LICENSE)
+
+Copystructure (https://github.com/mitchellh/copystructure)
+Copyright (c) 2014 Mitchell Hashimoto
+License: MIT (https://github.com/mitchellh/copystructure/blob/master/LICENSE)
+
+Reflectwalk (https://github.com/mitchellh/reflectwalk)
+Copyright (c) 2013 Mitchell Hashimoto
+License: MIT (https://github.com/mitchellh/reflectwalk/blob/master/LICENSE)
+
+Modern-Go Concurrent (https://github.com/modern-go/concurrent)
+License: MIT (https://github.com/modern-go/concurrent/blob/master/LICENSE)
+
+Modern-Go Reflect2 (https://github.com/modern-go/reflect2)
+License: Apache 2.0 (https://github.com/modern-go/reflect2/blob/master/LICENSE)
+
+OpenTelemetry Collector Contrib (https://github.com/open-telemetry/opentelemetry-collector-contrib)
+Copyright OpenTelemetry Authors
+License: Apache 2.0 (https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/LICENSE)
+
+Go-Difflib (https://github.com/pmezard/go-difflib)
+Copyright (c) 2013, Patrick Mezard
+License: BSD 3-Clause (https://github.com/pmezard/go-difflib/blob/master/LICENSE)
+
+UAP-Go (https://github.com/ua-parser/uap-go)
+Copyright 2009 Google Inc.
+License: Apache 2.0 (https://github.com/ua-parser/uap-go/blob/master/LICENSE)
+
+OpenTelemetry Collector (https://github.com/open-telemetry/opentelemetry-collector)
+Copyright OpenTelemetry Authors
+License: Apache 2.0 (https://github.com/open-telemetry/opentelemetry-collector/blob/main/LICENSE)
+
+OpenTelemetry SDK (https://github.com/open-telemetry/opentelemetry-go)
+Copyright OpenTelemetry Authors
+License: Apache 2.0 (https://github.com/open-telemetry/opentelemetry-go/blob/main/LICENSE)
+
+Golang x/exp (https://cs.opensource.google/go/x/exp)
+Copyright 2009 The Go Authors.
+License: BSD 3-Clause (https://cs.opensource.google/go/x/exp/+/master:LICENSE)
+
+Golang x/net (https://cs.opensource.google/go/x/net)
+Copyright 2009 The Go Authors.
+License: BSD 3-Clause (https://cs.opensource.google/go/x/net/+/master:LICENSE)
+
+Golang x/sys (https://cs.opensource.google/go/x/sys)
+Copyright 2009 The Go Authors.
+License: BSD 3-Clause (https://cs.opensource.google/go/x/sys/+/master:LICENSE)
+
+Golang x/text (https://cs.opensource.google/go/x/text)
+Copyright 2009 The Go Authors.
+License: BSD 3-Clause (https://cs.opensource.google/go/x/text/+/master:LICENSE)
+
+Genproto Googleapis RPC (https://pkg.go.dev/google.golang.org/genproto)
+Copyright 2020 Google LLC
+License: Apache 2.0 (https://pkg.go.dev/google.golang.org/genproto?tab=licenses)
+
+GRPC (https://github.com/grpc/grpc-go)
+Copyright 2021 gRPC authors.
+License: Apache 2.0 (https://github.com/grpc/grpc-go/blob/master/LICENSE)
+
+Protobuf (https://github.com/protocolbuffers/protobuf-go)
+Copyright (c) 2018 The Go Authors. All rights reserved.
+License: BSD 3-Clause (https://github.com/protocolbuffers/protobuf-go/blob/master/LICENSE)
+
+YAML v2 (https://gopkg.in/yaml.v2)
+Copyright (c) 2006-2010 Kirill Simonov
+Copyright (c) 2006-2011 Kirill Simonov
+License: Apache 2.0 (https://github.com/go-yaml/yaml/blob/v2/LICENSE)
+
+YAML v3 (https://gopkg.in/yaml.v3)
+Copyright (c) 2006-2010 Kirill Simonov
+Copyright (c) 2006-2011 Kirill Simonov
+License: MIT (https://github.com/go-yaml/yaml/blob/v3/LICENSE)
