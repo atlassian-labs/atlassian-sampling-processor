@@ -1,4 +1,4 @@
-package ptraceutil // import "github.com/atlassianlabs/atlassian-sampling-processor/internal/ptraceutil"
+package ptraceutil // import "github.com/atlassian-labs/atlassian-sampling-processor/internal/ptraceutil"
 
 import (
 	"iter"
