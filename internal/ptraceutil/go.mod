@@ -1,4 +1,4 @@
-module bitbucket.org/atlassian/observability-sidecar/internal/ptraceutil
+module github.com/atlassianlabs/atlassian-sampling-processor/internal/ptraceutil
 
 go 1.23.4
 

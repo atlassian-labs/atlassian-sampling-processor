@@ -1,4 +1,4 @@
-package ptraceutil // import "bitbucket.org/atlassian/observability-sidecar/internal/ptraceutil"
+package ptraceutil // import "github.com/atlassianlabs/atlassian-sampling-processor/internal/ptraceutil"
 
 import (
 	"iter"

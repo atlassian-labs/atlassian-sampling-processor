@@ -1,4 +1,4 @@
-package tracedata // import "bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
+package tracedata // import "github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 
 import (
 	"slices"
@@ -6,7 +6,7 @@ import (
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
 
-	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/priority"
+	"github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/priority"
 )
 
 type Metadata struct {

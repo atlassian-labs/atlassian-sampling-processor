@@ -1,6 +1,6 @@
 # Contributing to atlassian-sampling-processor
 
-Thank you for considering a contribution to [Project name]! Pull requests, issues and comments are welcome. For pull requests, please:
+Thank you for considering a contribution to atlassian-sampling-processor. Pull requests, issues and comments are welcome. For pull requests, please:
 
 * Add tests for new features and bug fixes
 * Follow the existing style
@@ -16,3 +16,7 @@ Prior to accepting your contributions we ask that you please follow the appropri
 
 * [CLA for corporate contributors](https://opensource.atlassian.com/corporate)
 * [CLA for individuals](https://opensource.atlassian.com/individual)
+
+### Developing
+
+Ensure no change is applied, and tests pass by running `make all`.

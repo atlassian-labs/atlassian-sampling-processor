@@ -1,0 +1,21 @@
+PROJECT_ROOT_DIR    := $(realpath $(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
+TOOLS_DIR           := $(PROJECT_ROOT_DIR)/tools
+TOOLS_SRC_DIR       := $(PROJECT_ROOT_DIR)/internal/tools
+GOCMD               ?= go
+
+.PHONY: porto
+porto:
+	find . \( -name "go.mod" -o -name "*.go" \) -type f -exec sed -i '' 's|bitbucket.org/atlassian/observability-sidecar|github.com/atlassian-labs/atlassian-sampling-processor|' {} +
+	$(TOOLS_DIR)/porto -w --include-internal ./
+
+.PHONY: info
+info:
+	@printf "\e[33mRunning command in \e[32m$(CURDIR)\e[0m\n"
+
+.PHONY: test
+test:
+	$(GOCMD) test ./...
+
+.PHONY: tidy
+tidy:
+	$(GOCMD) mod tidy

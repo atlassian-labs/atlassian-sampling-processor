@@ -4,7 +4,7 @@
 // Copyright © 2024 Atlassian US, Inc.
 // Copyright © 2024 Atlassian Pty Ltd.
 
-package atlassiansamplingprocessor // import "bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor"
+package atlassiansamplingprocessor // import "github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor"
 
 import (
 	"go.opentelemetry.io/collector/component"

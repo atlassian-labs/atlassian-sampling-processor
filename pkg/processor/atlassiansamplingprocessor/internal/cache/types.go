@@ -4,7 +4,7 @@
 // Copyright © 2024 Atlassian US, Inc.
 // Copyright © 2024 Atlassian Pty Ltd.
 
-package cache // import "bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/cache"
+package cache // import "github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/cache"
 
 import "go.opentelemetry.io/collector/pdata/pcommon"
 

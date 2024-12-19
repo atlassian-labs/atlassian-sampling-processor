@@ -1,4 +1,4 @@
-package priority // import "bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/priority"
+package priority // import "github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/priority"
 
 // Getter is an interface for structs that wish to indicate their Priority.
 // For example, implemented by tracedata.TraceData to indicate its caching priority.

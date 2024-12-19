@@ -1,9 +1,9 @@
-module bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor
+module github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor
 
 go 1.23.4
 
 require (
-	bitbucket.org/atlassian/observability-sidecar/internal/ptraceutil v0.7.6
+	github.com/atlassian-labs/atlassian-sampling-processor/internal/ptraceutil v0.7.6
 	github.com/golang/snappy v0.0.4
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl v0.115.0
@@ -79,4 +79,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace bitbucket.org/atlassian/observability-sidecar/internal/ptraceutil => ../../../internal/ptraceutil
+replace github.com/atlassian-labs/atlassian-sampling-processor/internal/ptraceutil => ../../../internal/ptraceutil

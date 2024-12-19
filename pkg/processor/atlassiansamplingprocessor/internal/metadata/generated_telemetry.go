@@ -13,11 +13,11 @@ import (
 )
 
 func Meter(settings component.TelemetrySettings) metric.Meter {
-	return settings.MeterProvider.Meter("bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor")
+	return settings.MeterProvider.Meter("github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor")
 }
 
 func Tracer(settings component.TelemetrySettings) trace.Tracer {
-	return settings.TracerProvider.Tracer("bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor")
+	return settings.TracerProvider.Tracer("github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor")
 }
 
 // TelemetryBuilder provides an interface for components to report telemetry
