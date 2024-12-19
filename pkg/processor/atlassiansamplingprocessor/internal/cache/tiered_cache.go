@@ -1,4 +1,4 @@
-package cache // import "bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/cache"
+package cache // import "github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/cache"
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
 
-	"bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor/internal/priority"
+	"github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/priority"
 )
 
 type tieredCache[V priority.Getter] struct {

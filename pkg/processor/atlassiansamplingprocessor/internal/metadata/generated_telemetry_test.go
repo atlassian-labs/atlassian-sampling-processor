@@ -49,14 +49,14 @@ func TestProviders(t *testing.T) {
 
 	meter := Meter(set)
 	if m, ok := meter.(mockMeter); ok {
-		require.Equal(t, "bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor", m.name)
+		require.Equal(t, "github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor", m.name)
 	} else {
 		require.Fail(t, "returned Meter not mockMeter")
 	}
 
 	tracer := Tracer(set)
 	if m, ok := tracer.(mockTracer); ok {
-		require.Equal(t, "bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor", m.name)
+		require.Equal(t, "github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor", m.name)
 	} else {
 		require.Fail(t, "returned Meter not mockTracer")
 	}

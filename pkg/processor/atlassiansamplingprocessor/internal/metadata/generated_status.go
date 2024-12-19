@@ -8,7 +8,7 @@ import (
 
 var (
 	Type      = component.MustNewType("atlassian_sampling")
-	ScopeName = "bitbucket.org/atlassian/observability-sidecar/pkg/processor/atlassiansamplingprocessor"
+	ScopeName = "github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor"
 )
 
 const (
