@@ -63,6 +63,8 @@ type atlassianSamplingProcessor struct {
 	memRegulator memory.RegulatorI
 	// memTicker controls how often the memRegulator is called
 	memTicker *time.Ticker
+	// regulatorStartTime is the time at which the regulator starts being used to regulate cache sizes
+	regulatorStartTime time.Time
 	// shutdownStart is a chan used to signal to the async goroutine to start shutdown.
 	// The deadline time is passed to the chan, so the async goroutine knows when to time out.
 	shutdownStart   chan time.Time
@@ -96,8 +98,8 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 		compress:        cfg.CompressionEnabled,
 	}
 
-	// Start with 80% of max cache size, the memory regulator will adjust the cache size as needed
-	initialPrimaryCacheSize := int(0.8 * float64(cfg.PrimaryCacheSize))
+	// Start with 60% of max cache size, the memory regulator will adjust the cache size as needed
+	initialPrimaryCacheSize := int(0.6 * float64(cfg.PrimaryCacheSize))
 
 	primaryCache, err := cache.NewLRUCache[*tracedata.TraceData](
 		initialPrimaryCacheSize,
@@ -143,7 +145,9 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 		if rErr != nil {
 			return nil, rErr
 		}
+
 		asp.memRegulator = memRegulator
+		asp.regulatorStartTime = time.Now().Add(cfg.RegulateCacheDelay)
 	}
 
 	pols, err := newPolicies(cfg.PolicyConfig, set)
@@ -238,9 +242,9 @@ func (asp *atlassianSamplingProcessor) consumeChan() {
 			for i := 0; i < resourceSpans.Len(); i++ {
 				asp.processTraces(ctx, resourceSpans.At(i))
 			}
-		case <-asp.memTicker.C:
+		case t := <-asp.memTicker.C:
 			// If ticker signals, call the memory regulator
-			if asp.memRegulator != nil {
+			if t.After(asp.regulatorStartTime) && asp.memRegulator != nil {
 				size := asp.memRegulator.RegulateCacheSize()
 				asp.telemetry.ProcessorAtlassianSamplingPrimaryCacheSize.Record(ctx, int64(size))
 			}
@@ -316,7 +320,7 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 			asp.sendSampledTraceData(ctx, currentTrace)
 			asp.telemetry.ProcessorAtlassianSamplingTracesSampled.Add(ctx, 1)
 		case evaluators.NotSampled:
-			asp.releaseNotSampledTrace(ctx, id)
+			asp.releaseNotSampledTrace(ctx, id, pol)
 		default:
 			if finalDecision == evaluators.LowPriority {
 				td.Metadata.Priority = priority.Low
@@ -382,7 +386,7 @@ func (asp *atlassianSamplingProcessor) cachedDecision(
 		}
 		asp.sampledDecisionCache.Put(id, time.Now())
 	} else {
-		asp.releaseNotSampledTrace(ctx, id)
+		asp.releaseNotSampledTrace(ctx, id, nil)
 	}
 	return true
 }
@@ -406,10 +410,25 @@ func (asp *atlassianSamplingProcessor) sendSampledTraceData(ctx context.Context,
 
 // releaseNotSampledTrace removes references to traces that have been decided to be not sampled.
 // It also caches the non sampled decision, and increments count of traces not sampled.
-func (asp *atlassianSamplingProcessor) releaseNotSampledTrace(ctx context.Context, id pcommon.TraceID) {
+func (asp *atlassianSamplingProcessor) releaseNotSampledTrace(ctx context.Context, id pcommon.TraceID, policy *policy) {
+	// Check if EmitSingleSpanForNotSampled is true in the policy config
+	if policy != nil && policy.emitSingleSpanForNotSampled {
+		// Create a placeholder trace with a single span containing the decision policy name
+		notSampledTrace := ptrace.NewTraces()
+		rs := notSampledTrace.ResourceSpans().AppendEmpty()
+		ss := rs.ScopeSpans().AppendEmpty()
+		span := ss.Spans().AppendEmpty()
+		span.SetTraceID(id)
+		span.SetName("TRACE NOT SAMPLED")
+		span.SetStartTimestamp(pcommon.NewTimestampFromTime(time.Now().Add(-time.Second)))
+		span.SetEndTimestamp(pcommon.NewTimestampFromTime(time.Now()))
+		span.Attributes().PutStr("sampling.policy", policy.name)
+
+		// Send the placeholder trace
+		asp.sendSampledTraceData(ctx, notSampledTrace)
+	}
 	asp.nonSampledDecisionCache.Put(id, time.Now())
 	asp.traceData.Delete(id)
-	asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
 }
 
 func (asp *atlassianSamplingProcessor) flushAll(ctx context.Context) error {

@@ -41,7 +41,7 @@ code significantly and potentially lead to bugs, as experienced in the upstream 
 
 This is, of course, a trade-off. The processing throughput is limited by the capacity of a single goroutine, 
 creating a potential bottleneck. This can be alleviated by deploying more instances of the processor with reduced 
-memory allocation per instance (e.g., more pods, each with less memory). If the bottleneck becomes a significant issue, 
+memory allocation per instance (e.g., more nodes, each with less memory). If the bottleneck becomes a significant issue, 
 a future enhancement could involve sharding the processor. This would involve splitting the processing workload by trace 
 ID and maintaining separate caches and states for each shard.
 
@@ -107,7 +107,8 @@ they can only access cached metadata from the cache. This restriction is in plac
 1. **Cache Compression:** It allows for the compression of spans within the cache. We are guaranteed that a compressed 
 blob is decompressed at most once, which occurs in the case it is sampled and transmitted. 
 Restricting the reading of cached spans allows for this optimisation.
-1.**Performance Efficiency:** It ensures that policy evaluation remains efficient, adhering to O(n) complexity, 
+
+2. **Performance Efficiency:** It ensures that policy evaluation remains efficient, adhering to O(n) complexity, 
 where n represents the number of spans in the current arriving batch. This prevents the policies from becoming slow.
 
 ## Caches

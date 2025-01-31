@@ -634,9 +634,9 @@ func TestConsumeTraces_PrimaryCacheSizeConfigApplied(t *testing.T) {
 	f := NewFactory()
 	cfg := (f.CreateDefaultConfig()).(*Config)
 
-	// We start with 80% of the specified cache size.
-	// So a max cache size of 3 results in an initial cache size of 2
-	cfg.PrimaryCacheSize = 3
+	// We start with 60% of the specified cache size.
+	// So a max cache size of 4 results in an initial cache size of 2
+	cfg.PrimaryCacheSize = 4
 	cfg.SecondaryCacheSize = 1
 
 	sink := &consumertest.TracesSink{}
@@ -926,6 +926,11 @@ func TestMemoryRegulateCacheSizeCalledOnTickerSignal(t *testing.T) {
 	cfg := (f.CreateDefaultConfig()).(*Config)
 	// Set the target heap size to 1000 bytes to trigger the channel
 	cfg.TargetHeapBytes = 1000
+	// Set regulate cache delay to 1 hour
+	delay, err := time.ParseDuration("1h")
+	require.NoError(t, err)
+	cfg.RegulateCacheDelay = delay
+
 	sink := &consumertest.TracesSink{}
 
 	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
@@ -947,10 +952,25 @@ func TestMemoryRegulateCacheSizeCalledOnTickerSignal(t *testing.T) {
 
 	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
 
-	// Simulate the ticker signal
+	// Simulate the ticker signal with the current time
 	mockTicker <- time.Now()
 
-	// Check if the RegulateCacheSize method is called
+	// The RegulateCacheSize method should not have been called since the 1 hour delay has not passed
+	assert.Eventually(t, func() bool {
+		select {
+		case <-done:
+			return false
+		default:
+			return true
+		}
+	}, 5*time.Second, 10*time.Millisecond, "RegulateCacheSize should not have been called")
+
+	// Simulate the ticker signal with the time 2 hours from now
+	d, err := time.ParseDuration("2h")
+	require.NoError(t, err)
+	mockTicker <- time.Now().Add(d)
+
+	// The RegulateCacheSize method should have been called since the 1 hour delay has passed
 	assert.Eventually(t, func() bool {
 		select {
 		case <-done:
@@ -962,4 +982,33 @@ func TestMemoryRegulateCacheSizeCalledOnTickerSignal(t *testing.T) {
 
 	// Verify if the RegulateCacheSize method has been called
 	assert.NoError(t, asp.Shutdown(ctx))
+}
+
+func TestReleaseNotSampledTrace_EmitSingleSpan(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := NewFactory()
+	cfg := (f.CreateDefaultConfig()).(*Config)
+	sink := &consumertest.TracesSink{}
+
+	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
+	require.NoError(t, err)
+	require.NotNil(t, asp)
+
+	policy := &policy{
+		name:                        "test-policy",
+		emitSingleSpanForNotSampled: true,
+	}
+
+	asp.releaseNotSampledTrace(ctx, testTraceID, policy)
+
+	assert.Equal(t, 1, sink.SpanCount())
+	consumed := sink.AllTraces()
+	assert.Len(t, consumed, 1)
+	consumedSpan := consumed[0].ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0)
+	assert.Equal(t, testTraceID, consumedSpan.TraceID())
+	assert.Equal(t, "TRACE NOT SAMPLED", consumedSpan.Name())
+	pn, found := consumedSpan.Attributes().Get("sampling.policy")
+	assert.True(t, found)
+	assert.Equal(t, "test-policy", pn.Str())
 }

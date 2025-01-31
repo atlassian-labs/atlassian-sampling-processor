@@ -1,6 +1,6 @@
 module github.com/atlassian-labs/atlassian-sampling-processor/internal/ptraceutil
 
-go 1.23.4
+go 1.23.5
 
 require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatatest v0.115.0

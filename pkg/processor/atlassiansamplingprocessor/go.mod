@@ -1,6 +1,6 @@
 module github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor
 
-go 1.23.4
+go 1.23.5
 
 require (
 	github.com/atlassian-labs/atlassian-sampling-processor/internal/ptraceutil v0.7.6

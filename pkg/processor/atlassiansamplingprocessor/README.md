@@ -44,7 +44,7 @@ The `primary_cache_size` value should be greater than 0, and should be set to a 
 `processor_atlassian_sampling_trace_eviction_time` metric to tune how long you would like your traces to stay pending
 in memory before being considered not-sampled.
 
-The primary cache size is initially set to 80% of the `primary_cache_size` value.
+The primary cache size is initially set to 60% of the `primary_cache_size` value.
 It is automatically adjusted depending on heap memory usage at runtime, but will not exceed the `primary_cache_size` value.
 
 ### `secondary_cache_size`
@@ -102,6 +102,9 @@ The order of the policies is important, as the first one that matches a non-pend
 used as the final decision.
 
 Policies include a `name`, `type`, and then further configuration depending on what the `type` was.
+
+`emit_single_span_for_not_sampled` is an optional field that can be set to `true` for a policy. If set, the processor will emit a single span for a trace that is not sampled, instead of dropping the trace entirely. 
+This span will have the same trace ID as the original trace. The span will have the name `TRACE NOT SAMPLED`, with policy name in its attribute.
 
 Current supported policy types are: 
 

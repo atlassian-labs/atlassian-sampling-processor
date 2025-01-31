@@ -9,6 +9,7 @@ package atlassiansamplingprocessor
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,12 +34,16 @@ func TestLoadConfig(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, sub.Unmarshal(cfg))
 
+	delay, err := time.ParseDuration("5m")
+	require.NoError(t, err)
+
 	assert.Equal(t,
 		cfg,
 		&Config{
 			PrimaryCacheSize:   1000,
 			SecondaryCacheSize: 100,
 			TargetHeapBytes:    100_000_000,
+			RegulateCacheDelay: delay,
 			DecisionCacheCfg:   DecisionCacheCfg{SampledCacheSize: 1000, NonSampledCacheSize: 10000},
 			CompressionEnabled: true,
 			PolicyConfig: []PolicyConfig{
@@ -151,8 +156,9 @@ func TestLoadConfig(t *testing.T) {
 				},
 				{
 					SharedPolicyConfig: SharedPolicyConfig{
-						Name: "test-policy-10",
-						Type: "downgrader",
+						Name:                        "test-policy-10",
+						Type:                        "downgrader",
+						EmitSingleSpanForNotSampled: true,
 					},
 					DowngraderConfig: DowngraderConfig{
 						DowngradeTo: "NotSampled",
