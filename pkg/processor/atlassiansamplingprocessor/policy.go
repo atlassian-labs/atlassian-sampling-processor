@@ -16,6 +16,8 @@ type policy struct {
 	name string
 	// type is used to identify this policy instance's policyType
 	policyType PolicyType
+	// emitSingleSpanForNotSampled is used to determine if a single span should be emitted for a trace that is not sampled.
+	emitSingleSpanForNotSampled bool
 	// evaluator that decides if a trace is sampled or not by this policy instance.
 	evaluator evaluators.PolicyEvaluator
 	// attribute to use in the telemetry to denote the policy.
@@ -38,10 +40,11 @@ func newPolicies(cfg []PolicyConfig, set component.TelemetrySettings) ([]*policy
 			return nil, err
 		}
 		p := &policy{
-			name:       policyCfg.Name,
-			policyType: policyCfg.Type,
-			evaluator:  eval,
-			attribute:  metric.WithAttributes(attribute.String("policy", policyCfg.Name)),
+			name:                        policyCfg.Name,
+			policyType:                  policyCfg.Type,
+			emitSingleSpanForNotSampled: policyCfg.EmitSingleSpanForNotSampled,
+			evaluator:                   eval,
+			attribute:                   metric.WithAttributes(attribute.String("policy", policyCfg.Name)),
 		}
 		pols[i] = p
 	}

@@ -31,6 +31,9 @@ type SharedPolicyConfig struct {
 	Name string `mapstructure:"name"`
 	// Type of the policy this will be used to match the proper configuration of the policy.
 	Type PolicyType `mapstructure:"type"`
+	// EmitSingleSpanForNotSampled enabled to emit a single span with same trace ID as the one that was dropped.
+	// So when people search for it, it comes up with “TRACE NOT SAMPLED” and then the sampling policy name attached as an attribute.
+	EmitSingleSpanForNotSampled bool `mapstructure:"emit_single_span_for_not_sampled"`
 	// Configs for probabilistic sampling policy evaluator.
 	ProbabilisticConfig `mapstructure:"probabilistic"`
 	// Configs for span count filter sampling policy evaluator.

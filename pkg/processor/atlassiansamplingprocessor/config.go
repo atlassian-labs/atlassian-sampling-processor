@@ -2,6 +2,7 @@ package atlassiansamplingprocessor // import "github.com/atlassian-labs/atlassia
 
 import (
 	"errors"
+	"time"
 
 	"go.opentelemetry.io/collector/component"
 	"go.uber.org/multierr"
@@ -16,6 +17,11 @@ type Config struct {
 	// If set, the processor may adjust cache sizes dynamically in order to keep within the target.
 	// A good starting point to set this is about 75% of overall memory resource allocation.
 	TargetHeapBytes uint64 `mapstructure:"target_heap_bytes"`
+
+	// RegulateCacheDelay is the amount of time after which the processor starts regulating cache sizes based on the set TargetHeapBytes (if specified).
+	// It is optional and defaults to 0s.
+	// This can be used to avoid regulating cache sizes on an initial empty cache, as it can cause unnecessary cache size adjustments and high memory usage.
+	RegulateCacheDelay time.Duration `mapstructure:"regulate_cache_delay"`
 
 	// PrimaryCacheSize sets the initial and maximum size of the primary cache that holds non-low priority traces.
 	PrimaryCacheSize int `mapstructure:"primary_cache_size"`
