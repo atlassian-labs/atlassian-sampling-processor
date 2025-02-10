@@ -2,6 +2,7 @@ package atlassiansamplingprocessor // import "github.com/atlassian-labs/atlassia
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"sync"
@@ -416,9 +417,11 @@ func (asp *atlassianSamplingProcessor) releaseNotSampledTrace(ctx context.Contex
 		// Create a placeholder trace with a single span containing the decision policy name
 		notSampledTrace := ptrace.NewTraces()
 		rs := notSampledTrace.ResourceSpans().AppendEmpty()
+		rs.Resource().Attributes().PutStr("service.name", "not-sampled-dummy-service")
 		ss := rs.ScopeSpans().AppendEmpty()
 		span := ss.Spans().AppendEmpty()
 		span.SetTraceID(id)
+		span.SetSpanID(generateRandomSpanID())
 		span.SetName("TRACE NOT SAMPLED")
 		span.SetStartTimestamp(pcommon.NewTimestampFromTime(time.Now().Add(-time.Second)))
 		span.SetEndTimestamp(pcommon.NewTimestampFromTime(time.Now()))
@@ -571,4 +574,14 @@ func (asp *atlassianSamplingProcessor) reportTraceDataErr(ctx context.Context, e
 	fields = append(fields, zap.Error(err), zap.Int64("spanCount", spanCount))
 	asp.log.Error("failed to perform operation on TraceData", fields...)
 	asp.telemetry.ProcessorAtlassianSamplingInternalErrorDroppedSpans.Add(ctx, spanCount)
+}
+
+// To generate a random span ID for the placeholder trace
+func generateRandomSpanID() pcommon.SpanID {
+	var id [8]byte
+	_, err := rand.Read(id[:])
+	if err != nil {
+		panic("failed to generate random span ID: " + err.Error())
+	}
+	return id
 }
