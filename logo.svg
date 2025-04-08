@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="240" height="240" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background circle -->
+    <circle cx="120" cy="120" r="110" fill="#DEEBFF" opacity="0.3"/>
+    
+    <!-- Funnel representing sampling -->
+    <path d="M60,40 L180,40 L140,120 L140,200 L100,200 L100,120 Z" 
+          fill="#0052CC" 
+          opacity="0.9"/>
+    
+    <!-- Trace dots and lines -->
+    <circle cx="80" cy="70" r="6" fill="#0052CC"/>
+    <circle cx="160" cy="70" r="6" fill="#0052CC"/>
+    <circle cx="120" cy="100" r="6" fill="#0052CC"/>
+    <circle cx="120" cy="160" r="6" fill="#0052CC"/>
+    
+    <!-- Connecting lines -->
+    <path d="M80,70 L120,100 M160,70 L120,100 M120,100 L120,160" 
+          stroke="#0052CC" 
+          stroke-width="3" 
+          fill="none"/>
+</svg>
