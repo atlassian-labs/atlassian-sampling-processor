@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="100" viewBox="0 0 400 100" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <!-- Icon -->
+  <g transform="translate(20,20)">
+    <path d="M30,0 L50,30 L30,60 L10,30 Z" fill="#000000"/>
+    <circle cx="30" cy="30" r="15" fill="#000000" fill-opacity="0.1"/>
+    <path d="M25,20 L35,20 L35,40 L25,40 Z" fill="#000000"/>
+  </g>
+  <!-- Text -->
+  <text x="100" y="55" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#000000">
+    Atlassian Sampling Processor
+  </text>
+  <!-- Decorative elements -->
+  <path d="M80,30 C85,30 85,50 80,50" stroke="#000000" stroke-width="2" fill="none"/>
+</svg>
