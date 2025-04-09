@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="400" height="100" viewBox="0 0 400 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="400" height="100" fill="white"/>
+  
+  <!-- Funnel/Filter Icon -->
+  <path d="M50,20 L90,20 L70,50 L70,70 L50,80 L50,50 Z" 
+        fill="#0052CC" 
+        stroke="#172B4D" 
+        stroke-width="2"/>
+  
+  <!-- Flow Lines -->
+  <path d="M30,30 Q50,40 30,50 Q50,60 30,70" 
+        fill="none" 
+        stroke="#0052CC" 
+        stroke-width="2"/>
+  
+  <!-- Text -->
+  <text x="110" y="45" 
+        font-family="Arial, sans-serif" 
+        font-size="24" 
+        font-weight="bold" 
+        fill="#172B4D">Atlassian</text>
+  <text x="110" y="70" 
+        font-family="Arial, sans-serif" 
+        font-size="20" 
+        fill="#172B4D">Sampling Processor</text>
+</svg>

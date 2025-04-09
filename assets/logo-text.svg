@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="400" height="80" viewBox="0 0 400 80" xmlns="http://www.w3.org/2000/svg">
+  <!-- Text -->
+  <text x="20" y="35" 
+        font-family="Arial, sans-serif" 
+        font-size="30" 
+        font-weight="bold" 
+        fill="#0052CC">Atlassian</text>
+  <text x="20" y="65" 
+        font-family="Arial, sans-serif" 
+        font-size="25" 
+        fill="#172B4D">Sampling Processor</text>
+</svg>
