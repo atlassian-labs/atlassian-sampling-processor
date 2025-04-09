@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="240" height="240" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+  <!-- Filter/Funnel shape -->
+  <path d="M40 40 L200 40 L140 140 L140 200 L100 220 L100 140 L40 40Z" 
+        fill="#FFFFFF" 
+        stroke="#FFFFFF" 
+        stroke-width="8"/>
+  
+  <!-- Sampling dots -->
+  <circle cx="80" cy="80" r="8" fill="#FFFFFF"/>
+  <circle cx="120" cy="100" r="8" fill="#FFFFFF"/>
+  <circle cx="160" cy="60" r="8" fill="#FFFFFF"/>
+  
+  <!-- Text -->
+  <text x="120" y="180" 
+        font-family="Arial, sans-serif" 
+        font-size="14" 
+        text-anchor="middle" 
+        fill="#FFFFFF">
+    Sampling Processor
+  </text>
+</svg>
