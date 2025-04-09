@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="100" viewBox="0 0 400 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background rectangle -->
+  <rect width="400" height="100" fill="white"/>
+  
+  <!-- Sampling icon -->
+  <g transform="translate(20,20)">
+    <path d="M30,30 L50,10 L70,40 L90,20" stroke="#0052CC" stroke-width="4" fill="none"/>
+    <circle cx="30" cy="30" r="4" fill="#0052CC"/>
+    <circle cx="50" cy="10" r="4" fill="#0052CC"/>
+    <circle cx="70" cy="40" r="4" fill="#0052CC"/>
+    <circle cx="90" cy="20" r="4" fill="#0052CC"/>
+  </g>
+  
+  <!-- Text -->
+  <text x="130" y="55" font-family="Arial, sans-serif" font-size="24" fill="#172B4D" font-weight="bold">
+    Atlassian Sampling Processor
+  </text>
+</svg>
