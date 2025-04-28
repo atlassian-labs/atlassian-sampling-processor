@@ -17,6 +17,7 @@ import (
 
 	"github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/evaluators"
 	"github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/memory"
+	"github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/metadata"
 	"github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/priority"
 	"github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
 )
@@ -76,7 +77,7 @@ func TestConsumeTraces_Basic(t *testing.T) {
 	cfg := f.CreateDefaultConfig()
 
 	ctx := context.Background()
-	set := processortest.NewNopSettings()
+	set := processortest.NewNopSettings(metadata.Type)
 	host := componenttest.NewNopHost()
 
 	tracesSink := new(consumertest.TracesSink)
