@@ -19,8 +19,8 @@ import (
 
 // pre compute attributes for performance
 var (
-	trueAttr  = metric.WithAttributes(attribute.Bool("hit", true))
-	falseAttr = metric.WithAttributes(attribute.Bool("hit", false))
+	trueAttr  = metric.WithAttributeSet(attribute.NewSet(attribute.Bool("hit", true)))
+	falseAttr = metric.WithAttributeSet(attribute.NewSet(attribute.Bool("hit", false)))
 )
 
 // lruCache implements Cache as a simple LRU cache.
@@ -28,6 +28,9 @@ type lruCache[V any] struct {
 	cache     *lru.Cache[pcommon.TraceID, V]
 	telemetry *metadata.TelemetryBuilder
 	size      int
+
+	// we store the attributes here, to avoid new allocations on the hot path
+	cacheNameAttr metric.MeasurementOption
 }
 
 var _ Cache[any] = (*lruCache[any])(nil)
@@ -35,22 +38,23 @@ var _ Cache[any] = (*lruCache[any])(nil)
 // NewLRUCache returns a new lruCache.
 // The size parameter indicates the amount of keys the cache will hold before it
 // starts evicting the least recently used key.
-func NewLRUCache[V any](size int, onEvicted func(pcommon.TraceID, V), telemetry *metadata.TelemetryBuilder) (Cache[V], error) {
+func NewLRUCache[V any](size int, onEvicted func(pcommon.TraceID, V), telemetry *metadata.TelemetryBuilder, name string) (Cache[V], error) {
 	c, err := lru.NewWithEvict[pcommon.TraceID, V](size, onEvicted)
 	if err != nil {
 		return nil, err
 	}
-	return &lruCache[V]{cache: c, size: size, telemetry: telemetry}, nil
+	return &lruCache[V]{cache: c, size: size, telemetry: telemetry,
+		cacheNameAttr: metric.WithAttributeSet(attribute.NewSet(attribute.String("cache", name)))}, nil
 }
 
 func (c *lruCache[V]) Get(id pcommon.TraceID) (V, bool) {
 	v, ok := c.cache.Get(id)
 	if ok {
 		c.telemetry.ProcessorAtlassianSamplingCacheReads.
-			Add(context.Background(), 1, trueAttr)
+			Add(context.Background(), 1, trueAttr, c.cacheNameAttr)
 	} else {
 		c.telemetry.ProcessorAtlassianSamplingCacheReads.
-			Add(context.Background(), 1, falseAttr)
+			Add(context.Background(), 1, falseAttr, c.cacheNameAttr)
 	}
 	return v, ok
 }

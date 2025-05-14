@@ -1016,3 +1016,28 @@ func TestReleaseNotSampledTrace_EmitSingleSpan(t *testing.T) {
 	assert.True(t, found)
 	assert.Equal(t, "test-policy", pn.Str())
 }
+
+func BenchmarkCacheEvictionCallBack(b *testing.B) {
+	b.ReportAllocs()
+
+	f := NewFactory()
+	cfg := (f.CreateDefaultConfig()).(*Config)
+	sink := &consumertest.TracesSink{}
+
+	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
+	require.NoError(b, err)
+	require.NotNil(b, asp)
+
+	// Put this trace into the cache with compression enabled
+	trace1 := ptrace.NewTraces()
+	span1 := trace1.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span1.SetTraceID(testTraceID)
+	span1.Attributes().PutStr("test", "value")
+
+	td, err := tracedata.NewTraceData(time.Now(), trace1, priority.Unspecified, asp.compress)
+	require.NoError(b, err)
+
+	for b.Loop() {
+		asp.cacheEvictionCallback("testCacheName", testTraceID, td)
+	}
+}

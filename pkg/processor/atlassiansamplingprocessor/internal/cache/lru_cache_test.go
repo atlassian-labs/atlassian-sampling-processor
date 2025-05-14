@@ -24,10 +24,11 @@ var testTelem = func() *metadata.TelemetryBuilder {
 }()
 
 var nopEvictCB = func(pcommon.TraceID, bool) {}
+var testCacheName = "testCache"
 
 func TestSinglePut(t *testing.T) {
 	t.Parallel()
-	c, err := NewLRUCache[int](2, func(pcommon.TraceID, int) {}, testTelem)
+	c, err := NewLRUCache[int](2, func(pcommon.TraceID, int) {}, testTelem, testCacheName)
 	require.NoError(t, err)
 	id := traceIDFromHex(t, "12341234123412341234123412341234")
 	c.Put(id, 123)
@@ -38,7 +39,7 @@ func TestSinglePut(t *testing.T) {
 
 func TestExceedsSizeLimit(t *testing.T) {
 	t.Parallel()
-	c, err := NewLRUCache[bool](2, nopEvictCB, testTelem)
+	c, err := NewLRUCache[bool](2, nopEvictCB, testTelem, testCacheName)
 	require.NoError(t, err)
 	id1 := traceIDFromHex(t, "12341234123412341234123412341231")
 	id2 := traceIDFromHex(t, "12341234123412341234123412341232")
@@ -61,7 +62,7 @@ func TestExceedsSizeLimit(t *testing.T) {
 
 func TestLeastRecentlyUsedIsEvicted(t *testing.T) {
 	t.Parallel()
-	c, err := NewLRUCache[bool](2, nopEvictCB, testTelem)
+	c, err := NewLRUCache[bool](2, nopEvictCB, testTelem, testCacheName)
 	require.NoError(t, err)
 	id1 := traceIDFromHex(t, "12341234123412341234123412341231")
 	id2 := traceIDFromHex(t, "12341234123412341234123412341232")
@@ -87,7 +88,7 @@ func TestLeastRecentlyUsedIsEvicted(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	t.Parallel()
-	c, err := NewLRUCache[bool](2, nopEvictCB, testTelem)
+	c, err := NewLRUCache[bool](2, nopEvictCB, testTelem, testCacheName)
 	require.NoError(t, err)
 	id := traceIDFromHex(t, "12341234123412341234123412341231")
 	c.Put(id, true)
@@ -103,7 +104,7 @@ func TestGetValues(t *testing.T) {
 	t.Parallel()
 	id1 := traceIDFromHex(t, "11111111111111111111111111111111")
 	id2 := traceIDFromHex(t, "22222222222222222222222222222222")
-	c, err := NewLRUCache[int](2, func(pcommon.TraceID, int) {}, testTelem)
+	c, err := NewLRUCache[int](2, func(pcommon.TraceID, int) {}, testTelem, testCacheName)
 	require.NoError(t, err)
 
 	c.Put(id1, 1)
@@ -117,7 +118,7 @@ func TestGetKeys(t *testing.T) {
 	t.Parallel()
 	id1 := traceIDFromHex(t, "11111111111111111111111111111111")
 	id2 := traceIDFromHex(t, "22222222222222222222222222222222")
-	c, err := NewLRUCache[int](2, func(pcommon.TraceID, int) {}, testTelem)
+	c, err := NewLRUCache[int](2, func(pcommon.TraceID, int) {}, testTelem, testCacheName)
 	require.NoError(t, err)
 
 	c.Put(id1, 1)
@@ -129,14 +130,14 @@ func TestGetKeys(t *testing.T) {
 
 func TestZeroSizeReturnsError(t *testing.T) {
 	t.Parallel()
-	c, err := NewLRUCache[bool](0, nopEvictCB, testTelem)
+	c, err := NewLRUCache[bool](0, nopEvictCB, testTelem, testCacheName)
 	assert.Error(t, err)
 	assert.Nil(t, c)
 }
 
 func TestSize(t *testing.T) {
 	t.Parallel()
-	c, _ := NewLRUCache[bool](2, nopEvictCB, testTelem)
+	c, _ := NewLRUCache[bool](2, nopEvictCB, testTelem, testCacheName)
 	assert.Equal(t, 2, c.Size())
 	c.Put(traceIDFromHex(t, "00000000000000001111111111111111"), true)
 	assert.Equal(t, 2, c.Size())
@@ -148,7 +149,7 @@ func TestSize(t *testing.T) {
 
 func TestResize(t *testing.T) {
 	t.Parallel()
-	c, _ := NewLRUCache[bool](2, nopEvictCB, testTelem)
+	c, _ := NewLRUCache[bool](2, nopEvictCB, testTelem, testCacheName)
 	id1 := traceIDFromHex(t, "00000000000000001111111111111111")
 	id2 := traceIDFromHex(t, "00000000000000001111111111111112")
 	c.Put(id1, true)
@@ -179,7 +180,7 @@ func TestResize(t *testing.T) {
 
 func TestClear(t *testing.T) {
 	t.Parallel()
-	c, _ := NewLRUCache[bool](2, nopEvictCB, testTelem)
+	c, _ := NewLRUCache[bool](2, nopEvictCB, testTelem, testCacheName)
 	assert.Equal(t, 2, c.Size())
 	assert.Equal(t, 0, len(c.Keys()))
 	id1 := traceIDFromHex(t, "00000000000000001111111111111111")
@@ -195,6 +196,21 @@ func TestClear(t *testing.T) {
 	v, ok := c.Get(id1)
 	assert.False(t, ok)
 	assert.False(t, v)
+}
+
+func BenchmarkGet(b *testing.B) {
+	b.ReportAllocs()
+
+	id1 := traceIDFromHex(&testing.B{}, "11111111111111111111111111111111")
+	c, err := NewLRUCache[int](2, func(pcommon.TraceID, int) {}, testTelem, testCacheName)
+	require.NoError(b, err)
+
+	c.Put(id1, 1)
+
+	// Loop() is a newish benchmark feature which automatically sets the timer and memstats to the scope of the loop
+	for b.Loop() {
+		_, _ = c.Get(id1)
+	}
 }
 
 func traceIDFromHex(t testing.TB, idStr string) pcommon.TraceID {

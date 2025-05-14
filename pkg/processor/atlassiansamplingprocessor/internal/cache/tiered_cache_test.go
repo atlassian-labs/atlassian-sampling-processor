@@ -22,9 +22,9 @@ func (t *testPriorityGetter) GetPriority() priority.Priority {
 }
 
 func TestTieredCache(t *testing.T) {
-	primary, err := NewLRUCache[*testPriorityGetter](10, nil, testTelem)
+	primary, err := NewLRUCache[*testPriorityGetter](10, nil, testTelem, testCacheName)
 	require.NoError(t, err)
-	secondary, err := NewLRUCache[*testPriorityGetter](10, nil, testTelem)
+	secondary, err := NewLRUCache[*testPriorityGetter](10, nil, testTelem, testCacheName)
 	require.NoError(t, err)
 	c, err := NewTieredCache[*testPriorityGetter](primary, secondary)
 	require.NoError(t, err)
@@ -81,9 +81,9 @@ func TestTieredCache(t *testing.T) {
 }
 
 func TestTieredClear(t *testing.T) {
-	primary, err := NewLRUCache[*testPriorityGetter](10, nil, testTelem)
+	primary, err := NewLRUCache[*testPriorityGetter](10, nil, testTelem, testCacheName)
 	require.NoError(t, err)
-	secondary, err := NewLRUCache[*testPriorityGetter](10, nil, testTelem)
+	secondary, err := NewLRUCache[*testPriorityGetter](10, nil, testTelem, testCacheName)
 	require.NoError(t, err)
 	c, err := NewTieredCache[*testPriorityGetter](primary, secondary)
 	require.NoError(t, err)
@@ -106,7 +106,7 @@ func TestTieredClear(t *testing.T) {
 }
 
 func TestConstruction_Errors(t *testing.T) {
-	c, err := NewLRUCache[*testPriorityGetter](10, nil, testTelem)
+	c, err := NewLRUCache[*testPriorityGetter](10, nil, testTelem, testCacheName)
 	require.NoError(t, err)
 	_, err = NewTieredCache[*testPriorityGetter](nil, nil)
 	assert.Error(t, err)
@@ -117,8 +117,8 @@ func TestConstruction_Errors(t *testing.T) {
 }
 
 func TestResize_DoesNothing(t *testing.T) {
-	primary, _ := NewLRUCache[*testPriorityGetter](10, nil, testTelem)
-	secondary, _ := NewLRUCache[*testPriorityGetter](10, nil, testTelem)
+	primary, _ := NewLRUCache[*testPriorityGetter](10, nil, testTelem, testCacheName)
+	secondary, _ := NewLRUCache[*testPriorityGetter](10, nil, testTelem, testCacheName)
 	c, _ := NewTieredCache[*testPriorityGetter](primary, secondary)
 	assert.Equal(t, 20, c.Size())
 	c.Resize(100)
