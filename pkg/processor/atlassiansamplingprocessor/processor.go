@@ -105,7 +105,8 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 	primaryCache, err := cache.NewLRUCache[*tracedata.TraceData](
 		initialPrimaryCacheSize,
 		asp.primaryEvictionCallback,
-		telemetry)
+		telemetry,
+		"primary")
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +117,8 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 		secondaryCache, err2 := cache.NewLRUCache[*tracedata.TraceData](
 			cfg.SecondaryCacheSize,
 			asp.secondaryEvictionCallback,
-			telemetry)
+			telemetry,
+			"secondary")
 		if err2 != nil {
 			return nil, err2
 		}
@@ -126,11 +128,11 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 		}
 	}
 
-	asp.sampledDecisionCache, err = cache.NewLRUCache[time.Time](cfg.SampledCacheSize, asp.onEvictSampled, telemetry)
+	asp.sampledDecisionCache, err = cache.NewLRUCache[time.Time](cfg.SampledCacheSize, asp.onEvictSampled, telemetry, "sampled_decision")
 	if err != nil {
 		return nil, err
 	}
-	asp.nonSampledDecisionCache, err = cache.NewLRUCache[time.Time](cfg.NonSampledCacheSize, asp.onEvictNotSampled, telemetry)
+	asp.nonSampledDecisionCache, err = cache.NewLRUCache[time.Time](cfg.NonSampledCacheSize, asp.onEvictNotSampled, telemetry, "nonsampled_decision")
 	if err != nil {
 		return nil, err
 	}
@@ -544,7 +546,9 @@ func (asp *atlassianSamplingProcessor) cacheEvictionCallback(cacheName string, i
 	if !sampled && !notSampled {
 		asp.nonSampledDecisionCache.Put(id, time.Now())
 		asp.telemetry.ProcessorAtlassianSamplingTracesNotSampled.Add(ctx, 1)
-		asp.telemetry.ProcessorAtlassianSamplingPolicyDecisions.Add(ctx, 1, evictionAttrs)
+		asp.telemetry.ProcessorAtlassianSamplingPolicyDecisions.
+			Add(ctx, 1, evictionAttrs,
+				metric.WithAttributeSet(attribute.NewSet(attribute.KeyValue{Key: "cache", Value: attribute.StringValue(cacheName)})))
 
 		// Only record eviction time when it was a trace that was not sampled, to avoid
 		// metrics being polluted with explicit cache deletions from traces being sampled and exported.

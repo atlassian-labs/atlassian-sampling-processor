@@ -16,6 +16,7 @@ var testTelem = func() *metadata.TelemetryBuilder {
 	tb, _ := metadata.NewTelemetryBuilder(componenttest.NewNopTelemetrySettings())
 	return tb
 }()
+var testCacheName = "testCache"
 
 type heapGetterMock struct {
 	heap uint64
@@ -28,7 +29,7 @@ func (hg *heapGetterMock) GetHeapUsage() uint64 {
 func TestRegulatorAdjustsCacheSize(t *testing.T) {
 	t.Parallel()
 	hgm := &heapGetterMock{heap: 100}
-	c, err := cache.NewLRUCache[bool](100, func(pcommon.TraceID, bool) {}, testTelem)
+	c, err := cache.NewLRUCache[bool](100, func(pcommon.TraceID, bool) {}, testTelem, testCacheName)
 	require.NoError(t, err)
 	r, err := NewRegulator(50, 100, 1000, hgm.GetHeapUsage, c)
 	require.NoError(t, err)
@@ -58,7 +59,7 @@ func TestRegulatorAdjustsCacheSize(t *testing.T) {
 func TestRegulatorValidatesInput(t *testing.T) {
 	t.Parallel()
 	hgm := &heapGetterMock{heap: 100}
-	c, _ := cache.NewLRUCache[bool](100, func(pcommon.TraceID, bool) {}, testTelem)
+	c, _ := cache.NewLRUCache[bool](100, func(pcommon.TraceID, bool) {}, testTelem, testCacheName)
 
 	// Invalid minSize
 	r, err := NewRegulator(-1, 1, 1, hgm.GetHeapUsage, c)
