@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+  <!-- Background Circle -->
+  <circle cx="120" cy="120" r="110" fill="#FFFFFF"/>
+  
+  <!-- Sampling Visualization - Multiple connected nodes representing sampling -->
+  <g fill="#000000">
+    <!-- Central Node -->
+    <circle cx="120" cy="120" r="20"/>
+    
+    <!-- Outer Nodes -->
+    <circle cx="70" cy="90" r="12" opacity="0.8"/>
+    <circle cx="170" cy="90" r="12" opacity="0.8"/>
+    <circle cx="70" cy="150" r="12" opacity="0.4"/>
+    <circle cx="170" cy="150" r="12" opacity="0.4"/>
+    
+    <!-- Connecting Lines -->
+    <path d="M 120 120 L 70 90" stroke="#000000" stroke-width="3"/>
+    <path d="M 120 120 L 170 90" stroke="#000000" stroke-width="3"/>
+    <path d="M 120 120 L 70 150" stroke="#000000" stroke-width="2" opacity="0.6"/>
+    <path d="M 120 120 L 170 150" stroke="#000000" stroke-width="2" opacity="0.6"/>
+  </g>
+  
+  <!-- Text -->
+  <text x="120" y="200" font-family="Arial, sans-serif" font-size="14" fill="#000000" text-anchor="middle">Sampling Processor</text>
+</svg>
