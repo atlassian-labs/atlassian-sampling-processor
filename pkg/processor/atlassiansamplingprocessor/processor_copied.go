@@ -19,7 +19,7 @@ type spanAndScope struct {
 	instrumentationScope *pcommon.InstrumentationScope
 }
 
-func groupSpansByTraceKey(resourceSpans ptrace.ResourceSpans) map[pcommon.TraceID][]spanAndScope {
+func groupSpansByTraceID(resourceSpans ptrace.ResourceSpans) spansGroupedByTraceID {
 	idToSpans := make(map[pcommon.TraceID][]spanAndScope)
 	ilss := resourceSpans.ScopeSpans()
 	for j := 0; j < ilss.Len(); j++ {
@@ -39,9 +39,9 @@ func groupSpansByTraceKey(resourceSpans ptrace.ResourceSpans) map[pcommon.TraceI
 	return idToSpans
 }
 
-func appendToTraces(dest ptrace.Traces, rss ptrace.ResourceSpans, spanAndScopes []spanAndScope) {
+func appendToTraces(dest ptrace.Traces, resource pcommon.Resource, spanAndScopes []spanAndScope) {
 	rs := dest.ResourceSpans().AppendEmpty()
-	rss.Resource().CopyTo(rs.Resource())
+	resource.CopyTo(rs.Resource())
 
 	scopePointerToNewScope := make(map[*pcommon.InstrumentationScope]*ptrace.ScopeSpans)
 	for _, spanAndScope := range spanAndScopes {

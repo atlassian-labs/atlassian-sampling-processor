@@ -58,7 +58,7 @@ type atlassianSamplingProcessor struct {
 	// made the not sampled decision and the time the decision was made
 	nonSampledDecisionCache cache.Cache[time.Time]
 	// incomingTraces is where the traces are put when they first arrive to the component
-	incomingTraces chan ptrace.Traces
+	incomingTraces chan []*groupedResourceSpans
 	// memRegulator can adjust cache sizes to target a given heap usage.
 	// May be nil, in which case the cache sizes will not be adjusted.
 	memRegulator memory.RegulatorI
@@ -93,7 +93,7 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 		telemetry: telemetry,
 		log:       set.Logger,
 
-		incomingTraces:  make(chan ptrace.Traces),
+		incomingTraces:  make(chan []*groupedResourceSpans),
 		shutdownStart:   make(chan time.Time),
 		flushOnShutdown: cfg.FlushOnShutdown,
 		compress:        cfg.CompressionEnabled,
@@ -226,11 +226,20 @@ func (asp *atlassianSamplingProcessor) ConsumeTraces(ctx context.Context, td ptr
 		asp.telemetry.ProcessorAtlassianSamplingChanBlockingTime.Record(ctx, time.Since(start).Nanoseconds())
 	}()
 
-	asp.incomingTraces <- td
+	resSpansGroupedByTraceID := make([]*groupedResourceSpans, 0, td.ResourceSpans().Len())
+	resourceSpans := td.ResourceSpans()
+	for i := 0; i < resourceSpans.Len(); i++ {
+		resSpansGroupedByTraceID = append(resSpansGroupedByTraceID, &groupedResourceSpans{
+			resource:              resourceSpans.At(i).Resource(),
+			spansGroupedByTraceID: groupSpansByTraceID(resourceSpans.At(i)),
+		})
+	}
+
+	asp.incomingTraces <- resSpansGroupedByTraceID
 	return nil
 }
 
-// ConsumeTracesAsync reads the traces from a channel.
+// consumeChan reads the traces from a channel.
 func (asp *atlassianSamplingProcessor) consumeChan() {
 	asp.waitGroup.Add(1)
 	defer asp.waitGroup.Done()
@@ -240,10 +249,9 @@ func (asp *atlassianSamplingProcessor) consumeChan() {
 	for {
 		select {
 		// Regular operating case
-		case nt := <-asp.incomingTraces:
-			resourceSpans := nt.ResourceSpans()
-			for i := 0; i < resourceSpans.Len(); i++ {
-				asp.processTraces(ctx, resourceSpans.At(i))
+		case grsArr := <-asp.incomingTraces:
+			for _, grs := range grsArr {
+				asp.processTraces(ctx, grs)
 			}
 		case t := <-asp.memTicker.C:
 			// If ticker signals, call the memory regulator
@@ -256,10 +264,9 @@ func (asp *atlassianSamplingProcessor) consumeChan() {
 			shutdownCtx, cancel := context.WithDeadline(ctx, deadline)
 			for {
 				select {
-				case nt := <-asp.incomingTraces:
-					resourceSpans := nt.ResourceSpans()
-					for i := 0; i < resourceSpans.Len(); i++ {
-						asp.processTraces(shutdownCtx, resourceSpans.At(i))
+				case grsArr := <-asp.incomingTraces:
+					for _, grs := range grsArr {
+						asp.processTraces(shutdownCtx, grs)
 					}
 				case <-shutdownCtx.Done():
 					cancel()
@@ -274,15 +281,14 @@ func (asp *atlassianSamplingProcessor) consumeChan() {
 	}
 }
 
-func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resourceSpans ptrace.ResourceSpans) {
-	idToSpanAndScope := groupSpansByTraceKey(resourceSpans)
-	for id, spans := range idToSpanAndScope {
-		if asp.cachedDecision(ctx, id, resourceSpans, spans) {
+func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, grs *groupedResourceSpans) {
+	for id, spans := range grs.spansGroupedByTraceID {
+		if asp.cachedDecision(ctx, id, grs.resource, spans) {
 			continue
 		}
 
 		currentTrace := ptrace.NewTraces()
-		appendToTraces(currentTrace, resourceSpans, spans)
+		appendToTraces(currentTrace, grs.resource, spans)
 
 		td, err := tracedata.NewTraceData(time.Now(), currentTrace, priority.Unspecified, asp.compress)
 		if err != nil {
@@ -354,18 +360,22 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, resour
 func (asp *atlassianSamplingProcessor) cachedDecision(
 	ctx context.Context,
 	id pcommon.TraceID,
-	resourceSpans ptrace.ResourceSpans,
+	resource pcommon.Resource,
 	spans []spanAndScope,
 ) bool {
-	decision, isDecisionSpan := resourceSpans.Resource().Attributes().Get(decisionSpanKey)
+	decision, isDecisionSpan := resource.Attributes().Get(decisionSpanKey)
 
 	// check decision caches
 	if _, ok := asp.sampledDecisionCache.Get(id); ok {
 		// export if not decision span
 		if !isDecisionSpan {
-			td := ptrace.NewTraces()
-			appendToTraces(td, resourceSpans, spans)
-			asp.sendSampledTraceData(ctx, td)
+			// We can palm this expensive operation off to a goroutine, since we know
+			// there won't be anymore cache accesses that must be synchronized.
+			go func() {
+				td := ptrace.NewTraces()
+				appendToTraces(td, resource, spans)
+				asp.sendSampledTraceData(context.Background(), td)
+			}()
 		}
 		return true
 	}
