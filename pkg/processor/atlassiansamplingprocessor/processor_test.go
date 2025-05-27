@@ -163,6 +163,9 @@ func TestConsumeTraces_DecisionCachesAreRespected(t *testing.T) {
 	// should be sampled by policy
 	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
 	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+	waitUntil(t, func() bool {
+		return sink.SpanCount() > 0
+	})
 	assert.Equal(t, 1, sink.SpanCount())
 	sink.Reset()
 
@@ -170,6 +173,9 @@ func TestConsumeTraces_DecisionCachesAreRespected(t *testing.T) {
 	// send again, this should also be let through
 	require.NoError(t, asp.ConsumeTraces(ctx, trace1))
 	require.NoError(t, asp.ConsumeTraces(ctx, ptrace.NewTraces()))
+	waitUntil(t, func() bool {
+		return sink.SpanCount() > 0
+	})
 	assert.Equal(t, 1, sink.SpanCount())
 	_, ok := asp.sampledDecisionCache.Get(testTraceID)
 	assert.True(t, ok)
@@ -1040,4 +1046,18 @@ func BenchmarkCacheEvictionCallBack(b *testing.B) {
 	for b.Loop() {
 		asp.cacheEvictionCallback("testCacheName", testTraceID, td)
 	}
+}
+
+func waitUntil(t *testing.T, condition func() bool) {
+	t.Helper()
+	timeout := 2 * time.Second
+	interval := 5 * time.Millisecond
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return
+		}
+		time.Sleep(interval)
+	}
+	t.Fatalf("Condition not met within %s", timeout)
 }
