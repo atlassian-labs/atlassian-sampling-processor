@@ -1,0 +1,26 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Flow/Pipeline Design - represents data processing flow -->
+  <defs>
+    <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1B365D;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#0052CC;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00B8D9;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main pipeline flow -->
+  <path d="M15 45 Q35 25 60 45 Q85 65 105 45" stroke="url(#gradient2)" stroke-width="8" fill="none" stroke-linecap="round"/>
+  
+  <!-- Processing nodes -->
+  <circle cx="35" cy="35" r="6" fill="#0052CC"/>
+  <circle cx="60" cy="55" r="8" fill="#1B365D"/>
+  <circle cx="85" cy="35" r="6" fill="#00B8D9"/>
+  
+  <!-- Data flow indicators -->
+  <path d="M25 55 L35 45 L25 35" stroke="#00B8D9" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M70 65 L80 55 L70 45" stroke="#00B8D9" stroke-width="3" fill="none" stroke-linecap="round"/>
+  
+  <!-- Cache/memory representation -->
+  <rect x="50" y="75" width="20" height="12" fill="#0052CC" opacity="0.6" rx="6"/>
+  <rect x="52" y="77" width="16" height="8" fill="white" opacity="0.4" rx="4"/>
+</svg>

@@ -1,4 +1,8 @@
-# atlassian-sampling-processor 
+# atlassian-sampling-processor
+
+<img src="atlassian-sampling-processor-logo-1.svg" alt="Atlassian Sampling Processor Logo - Funnel" width="80" height="80">
+<img src="atlassian-sampling-processor-logo-2.svg" alt="Atlassian Sampling Processor Logo - Flow" width="80" height="80">
+<img src="atlassian-sampling-processor-logo-3.svg" alt="Atlassian Sampling Processor Logo - Geometric" width="80" height="80"> 
 
 This repo contains the source code for the Atlassian Sampling Processor, a tail-based sampler
 implemented as an OpenTelemetry Collector processor.

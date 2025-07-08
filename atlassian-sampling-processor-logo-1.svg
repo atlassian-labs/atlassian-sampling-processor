@@ -1,0 +1,29 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Funnel/Filter Design - represents sampling and filtering -->
+  <defs>
+    <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00B8D9;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0052CC;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main funnel shape -->
+  <path d="M20 25 L100 25 L80 60 L40 60 Z" fill="url(#gradient1)" opacity="0.9"/>
+  
+  <!-- Input particles (many) -->
+  <circle cx="30" cy="15" r="2" fill="#1B365D"/>
+  <circle cx="45" cy="12" r="2" fill="#1B365D"/>
+  <circle cx="60" cy="15" r="2" fill="#1B365D"/>
+  <circle cx="75" cy="12" r="2" fill="#1B365D"/>
+  <circle cx="90" cy="15" r="2" fill="#1B365D"/>
+  
+  <!-- Filtered particles (fewer) -->
+  <circle cx="50" cy="75" r="3" fill="#0052CC"/>
+  <circle cx="70" cy="78" r="3" fill="#0052CC"/>
+  
+  <!-- Output stream -->
+  <rect x="57" y="85" width="6" height="20" fill="#00B8D9" rx="3"/>
+  
+  <!-- Negative space elements for modern look -->
+  <circle cx="60" cy="42" r="8" fill="white" opacity="0.3"/>
+</svg>

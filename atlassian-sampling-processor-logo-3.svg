@@ -1,0 +1,36 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Geometric/Abstract Design - represents efficiency and modern tech -->
+  <defs>
+    <linearGradient id="gradient3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00B8D9;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#1B365D;stop-opacity:0.8" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main geometric shape - hexagon representing processing -->
+  <polygon points="60,20 85,35 85,65 60,80 35,65 35,35" fill="url(#gradient3)" stroke="#0052CC" stroke-width="2"/>
+  
+  <!-- Inner processing core -->
+  <circle cx="60" cy="50" r="15" fill="#0052CC" opacity="0.7"/>
+  
+  <!-- Sampling pattern - dots in decreasing density -->
+  <g opacity="0.8">
+    <!-- Dense input -->
+    <circle cx="25" cy="30" r="1.5" fill="#1B365D"/>
+    <circle cx="25" cy="40" r="1.5" fill="#1B365D"/>
+    <circle cx="25" cy="50" r="1.5" fill="#1B365D"/>
+    <circle cx="25" cy="60" r="1.5" fill="#1B365D"/>
+    <circle cx="25" cy="70" r="1.5" fill="#1B365D"/>
+    
+    <!-- Sparse output -->
+    <circle cx="95" cy="40" r="2" fill="#00B8D9"/>
+    <circle cx="95" cy="60" r="2" fill="#00B8D9"/>
+  </g>
+  
+  <!-- Negative space for modern aesthetic -->
+  <circle cx="60" cy="50" r="6" fill="white" opacity="0.4"/>
+  
+  <!-- Processing indicators -->
+  <path d="M45 50 L55 50" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <path d="M65 50 L75 50" stroke="white" stroke-width="2" stroke-linecap="round"/>
+</svg>
