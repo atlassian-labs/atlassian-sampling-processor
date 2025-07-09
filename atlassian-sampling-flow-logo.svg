@@ -1,0 +1,34 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="60" cy="60" r="55" fill="#f4f5f7" stroke="#0052cc" stroke-width="2"/>
+  
+  <!-- Processing pipeline -->
+  <rect x="15" y="45" width="15" height="30" rx="3" fill="#36b37e" opacity="0.9"/>
+  <rect x="40" y="35" width="15" height="50" rx="3" fill="#0052cc" opacity="0.9"/>
+  <rect x="65" y="40" width="15" height="40" rx="3" fill="#36b37e" opacity="0.9"/>
+  <rect x="90" y="50" width="15" height="20" rx="3" fill="#ffab00" opacity="0.8"/>
+  
+  <!-- Flow connections -->
+  <path d="M30 60 L40 60" stroke="#0052cc" stroke-width="2" fill="none"/>
+  <path d="M55 60 L65 60" stroke="#0052cc" stroke-width="2" fill="none"/>
+  <path d="M80 60 L90 60" stroke="#0052cc" stroke-width="2" fill="none"/>
+  
+  <!-- Flow arrows -->
+  <path d="M37 58 L40 60 L37 62 Z" fill="#0052cc"/>
+  <path d="M62 58 L65 60 L62 62 Z" fill="#0052cc"/>
+  <path d="M87 58 L90 60 L87 62 Z" fill="#0052cc"/>
+  
+  <!-- Input data stream -->
+  <circle cx="8" cy="55" r="1.5" fill="#36b37e"/>
+  <circle cx="8" cy="60" r="1.5" fill="#36b37e"/>
+  <circle cx="8" cy="65" r="1.5" fill="#36b37e"/>
+  
+  <!-- Output optimized stream -->
+  <circle cx="112" cy="58" r="1.5" fill="#ffab00"/>
+  <circle cx="112" cy="62" r="1.5" fill="#ffab00"/>
+  
+  <!-- Performance indicators -->
+  <path d="M22 25 L28 30 L22 35" stroke="#36b37e" stroke-width="1.5" fill="none" opacity="0.7"/>
+  <path d="M47 20 L53 25 L47 30" stroke="#0052cc" stroke-width="1.5" fill="none" opacity="0.7"/>
+  <path d="M72 25 L78 30 L72 35" stroke="#36b37e" stroke-width="1.5" fill="none" opacity="0.7"/>
+</svg>

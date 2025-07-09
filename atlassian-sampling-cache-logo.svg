@@ -1,0 +1,27 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="60" cy="60" r="55" fill="#f4f5f7" stroke="#0052cc" stroke-width="2"/>
+  
+  <!-- Primary cache layer (larger) -->
+  <rect x="20" y="40" width="80" height="20" rx="4" fill="#0052cc" opacity="0.9"/>
+  
+  <!-- Secondary cache layer (smaller) -->
+  <rect x="30" y="65" width="60" height="15" rx="3" fill="#36b37e" opacity="0.8"/>
+  
+  <!-- Decision cache layer (smallest) -->
+  <rect x="40" y="85" width="40" height="10" rx="2" fill="#ffab00" opacity="0.7"/>
+  
+  <!-- Data flow arrows -->
+  <path d="M45 25 L50 35 L40 35 Z" fill="#0052cc" opacity="0.6"/>
+  <path d="M60 25 L65 35 L55 35 Z" fill="#0052cc" opacity="0.6"/>
+  <path d="M75 25 L80 35 L70 35 Z" fill="#0052cc" opacity="0.6"/>
+  
+  <!-- Output arrow -->
+  <path d="M55 105 L60 115 L65 105 L62 105 L62 100 L58 100 L58 105 Z" fill="#36b37e"/>
+  
+  <!-- Memory optimization indicators -->
+  <circle cx="25" cy="50" r="1.5" fill="#ffffff" opacity="0.8"/>
+  <circle cx="95" cy="50" r="1.5" fill="#ffffff" opacity="0.8"/>
+  <circle cx="35" cy="72" r="1" fill="#ffffff" opacity="0.8"/>
+  <circle cx="85" cy="72" r="1" fill="#ffffff" opacity="0.8"/>
+</svg>

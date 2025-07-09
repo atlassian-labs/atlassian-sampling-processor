@@ -1,0 +1,22 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="60" cy="60" r="55" fill="#f4f5f7" stroke="#0052cc" stroke-width="2"/>
+  
+  <!-- Funnel shape representing sampling -->
+  <path d="M25 35 L95 35 L95 45 L75 65 L75 85 L45 85 L45 65 L25 45 Z" 
+        fill="#0052cc" opacity="0.9"/>
+  
+  <!-- Data dots entering the funnel -->
+  <circle cx="35" cy="25" r="2" fill="#36b37e"/>
+  <circle cx="50" cy="20" r="2" fill="#36b37e"/>
+  <circle cx="65" cy="25" r="2" fill="#36b37e"/>
+  <circle cx="80" cy="20" r="2" fill="#36b37e"/>
+  
+  <!-- Filtered data dots exiting -->
+  <circle cx="55" cy="95" r="2" fill="#0052cc"/>
+  <circle cx="65" cy="95" r="2" fill="#0052cc"/>
+  
+  <!-- Processing indicator lines -->
+  <line x1="30" y1="50" x2="35" y2="50" stroke="#36b37e" stroke-width="1.5" opacity="0.7"/>
+  <line x1="85" y1="50" x2="90" y2="50" stroke="#36b37e" stroke-width="1.5" opacity="0.7"/>
+</svg>
