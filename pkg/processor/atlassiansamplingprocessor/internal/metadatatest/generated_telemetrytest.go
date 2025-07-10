@@ -82,22 +82,6 @@ func AssertEqualProcessorAtlassianSamplingInternalErrorDroppedSpans(t *testing.T
 	metricdatatest.AssertEqual(t, want, got, opts...)
 }
 
-func AssertEqualProcessorAtlassianSamplingOverlyEagerLonelyRootSpanDecisions(t *testing.T, tt *componenttest.Telemetry, dps []metricdata.DataPoint[int64], opts ...metricdatatest.Option) {
-	want := metricdata.Metrics{
-		Name:        "otelcol_processor_atlassian_sampling_overly_eager_lonely_root_span_decisions",
-		Description: "Number of spans that have been aggressively sampled out by root span policy",
-		Unit:        "{spans}",
-		Data: metricdata.Sum[int64]{
-			Temporality: metricdata.CumulativeTemporality,
-			IsMonotonic: true,
-			DataPoints:  dps,
-		},
-	}
-	got, err := tt.GetMetric("otelcol_processor_atlassian_sampling_overly_eager_lonely_root_span_decisions")
-	require.NoError(t, err)
-	metricdatatest.AssertEqual(t, want, got, opts...)
-}
-
 func AssertEqualProcessorAtlassianSamplingPolicyDecisions(t *testing.T, tt *componenttest.Telemetry, dps []metricdata.DataPoint[int64], opts ...metricdatatest.Option) {
 	want := metricdata.Metrics{
 		Name:        "otelcol_processor_atlassian_sampling_policy_decisions",

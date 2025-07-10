@@ -1,4 +1,5 @@
 atlassian_sampling:
+  shards: 5
   primary_cache_size: 1000
   secondary_cache_size: 100
   target_heap_bytes: 100_000_000 # 100 MB
@@ -7,6 +8,7 @@ atlassian_sampling:
     sampled_cache_size: 1000
     non_sampled_cache_size: 10000
   compression_enabled: true
+  preprocess_buffer_size: 10
   policies:
     [
       {

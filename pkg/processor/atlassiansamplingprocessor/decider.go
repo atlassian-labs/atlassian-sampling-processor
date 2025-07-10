@@ -45,10 +45,9 @@ func (d *decider) MakeDecision(ctx context.Context, id pcommon.TraceID, currentT
 		if err != nil {
 			d.log.Warn("policy evaluation errored", zap.Error(err), zap.String("policy.name", p.name))
 		}
-		d.telemetry.ProcessorAtlassianSamplingPolicyDecisions.Add(ctx, 1, metric.WithAttributes(
+		d.telemetry.ProcessorAtlassianSamplingPolicyDecisions.Add(ctx, 1, metric.WithAttributeSet(attribute.NewSet(
 			attribute.String("policy", p.name),
-			attribute.String("decision", decision.String()),
-		))
+			attribute.String("decision", decision.String()))))
 
 		// Assume we have policy list [X, Y, Z],
 		// 1. Trace A/Span A is marked as low priority by a policy Z, we will set LastLowPriorityDecisionName to Z.

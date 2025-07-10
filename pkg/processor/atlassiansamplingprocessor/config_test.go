@@ -40,12 +40,14 @@ func TestLoadConfig(t *testing.T) {
 	assert.Equal(t,
 		cfg,
 		&Config{
-			PrimaryCacheSize:   1000,
-			SecondaryCacheSize: 100,
-			TargetHeapBytes:    100_000_000,
-			RegulateCacheDelay: delay,
-			DecisionCacheCfg:   DecisionCacheCfg{SampledCacheSize: 1000, NonSampledCacheSize: 10000},
-			CompressionEnabled: true,
+			PrimaryCacheSize:     1000,
+			SecondaryCacheSize:   100,
+			TargetHeapBytes:      100_000_000,
+			RegulateCacheDelay:   delay,
+			DecisionCacheCfg:     DecisionCacheCfg{SampledCacheSize: 1000, NonSampledCacheSize: 10000},
+			CompressionEnabled:   true,
+			PreprocessBufferSize: 10,
+			Shards:               5,
 			PolicyConfig: []PolicyConfig{
 				{
 					SharedPolicyConfig: SharedPolicyConfig{
@@ -185,6 +187,7 @@ func TestValidate(t *testing.T) {
 			c: &Config{
 				PrimaryCacheSize:   100,
 				SecondaryCacheSize: 10,
+				Shards:             1,
 				PolicyConfig:       make([]PolicyConfig, 0),
 			},
 			expectedError: nil,
@@ -194,6 +197,7 @@ func TestValidate(t *testing.T) {
 			c: &Config{
 				PrimaryCacheSize:   0,
 				SecondaryCacheSize: 10,
+				Shards:             1,
 				PolicyConfig:       make([]PolicyConfig, 0),
 			},
 			expectedError: primaryCacheSizeError,
@@ -203,6 +207,7 @@ func TestValidate(t *testing.T) {
 			c: &Config{
 				PrimaryCacheSize:   10,
 				SecondaryCacheSize: 0,
+				Shards:             1,
 				PolicyConfig:       make([]PolicyConfig, 0),
 			},
 			expectedError: secondaryCacheSizeError,
@@ -212,6 +217,7 @@ func TestValidate(t *testing.T) {
 			c: &Config{
 				PrimaryCacheSize:   100,
 				SecondaryCacheSize: 50,
+				Shards:             1,
 				PolicyConfig:       make([]PolicyConfig, 0),
 			},
 			expectedError: nil,
@@ -221,13 +227,36 @@ func TestValidate(t *testing.T) {
 			c: &Config{
 				PrimaryCacheSize:   100,
 				SecondaryCacheSize: 55,
+				Shards:             1,
 				PolicyConfig:       make([]PolicyConfig, 0),
 			},
 			expectedError: secondaryCacheSizeError,
 		},
 		{
+			name: "Invalid buffer size",
+			c: &Config{
+				PrimaryCacheSize:     100,
+				SecondaryCacheSize:   10,
+				Shards:               1,
+				PolicyConfig:         make([]PolicyConfig, 0),
+				PreprocessBufferSize: -1,
+			},
+			expectedError: invalidBufferSize,
+		},
+		{
+			name: "Invalid shard number",
+			c: &Config{
+				PrimaryCacheSize:   100,
+				SecondaryCacheSize: 10,
+				PolicyConfig:       make([]PolicyConfig, 0),
+				Shards:             -1,
+			},
+			expectedError: invalidShardCount,
+		},
+		{
 			name: "No duplicate policy names",
 			c: &Config{
+				Shards:             1,
 				PrimaryCacheSize:   100,
 				SecondaryCacheSize: 10,
 				PolicyConfig: []PolicyConfig{
@@ -259,6 +288,7 @@ func TestValidate(t *testing.T) {
 			c: &Config{
 				PrimaryCacheSize:   100,
 				SecondaryCacheSize: 10,
+				Shards:             1,
 				PolicyConfig: []PolicyConfig{
 					{
 						SharedPolicyConfig: SharedPolicyConfig{

@@ -38,14 +38,6 @@ Number of spans that have been dropped due to an internal error
 | ---- | ----------- | ---------- | --------- |
 | {spans} | Sum | Int | true |
 
-### otelcol_processor_atlassian_sampling_overly_eager_lonely_root_span_decisions
-
-Number of spans that have been aggressively sampled out by root span policy
-
-| Unit | Metric Type | Value Type | Monotonic |
-| ---- | ----------- | ---------- | --------- |
-| {spans} | Sum | Int | true |
-
 ### otelcol_processor_atlassian_sampling_policy_decisions
 
 Sampling decisions made specifying policy and decision.

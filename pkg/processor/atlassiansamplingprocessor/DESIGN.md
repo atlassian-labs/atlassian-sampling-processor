@@ -8,8 +8,8 @@ It also contains information about how to run in a production environment.
 
 This section describes, in order, the path a trace takes when consumed by this processor.
 
-1. `ConsumeTraces()` is invoked. This blocks on send to an unbuffered `chan`, and then returns.
-2. `consumeChan()` reads the `chan` and processes the traces.
+1. `ConsumeTraces()` is invoked. This organises the data by trace ID and shard, does an early decision check, sends to the shard `chan`, and then returns.
+2. `shardListener()` reads its assigned `chan` and processes the traces.
 3. The data is organised by trace ID, and the main loop in `processor.go` processes the data one trace ID at a time.
 4. The decision caches are accessed to determine if a sampling decision has already been made for the current trace ID. 
 If a prior decision exists, this allows us to streamline the processing. When the cache indicates that the trace has 
@@ -25,25 +25,21 @@ Least Recently Used (LRU) basis, meaning that adding new data to the cache may i
 least recently accessed trace (i.e. the trace that last received a new span the longest time ago). When a trace is 
 evicted, it is considered "not sampled" and added to the decision cache.
 
-## Synchronized Goroutine
+## Synchronization / Sharding
 
-The main operation of the processor is executed as a single goroutine, synchronized through an unbuffered channel.
+The main processing of this component is done by async goroutines (shard listeners) which read off "shards" (channels).
+Trace data is sharded in `ConsumeTraces()` before being sent to the appropriate shard for processing.
 
 In the collector architecture, receivers typically function as servers that accept and process data using multiple goroutines. 
 Consequently, processors like this one are invoked concurrently through the `ConsumeTraces()` method. 
-To ensure synchronization, the processor sends data to a channel, which is then received by a 
-dedicated goroutine (`consumeChan()`). This design guarantees that all data is processed by a single goroutine. 
-It draws inspiration from the core collector's batch processor.
+To ensure synchronization, the processor sends data to channels, which is then received by a 
+dedicated shard listener. Spans belonging to the same trace will all be sent to the same shard, and that shard will
+be processed entirely synchronously by the same shard listener - this ensures data integrity because writes are limited 
+to these shard listeners. Each shard listener can be thought of "owning" a section of the caches.
 
-The decision to synchronize is primarily driven by the need to maintain the integrity of internal 
-caches while keeping the design simple. Allowing concurrent access to cached trace data would complicate the 
-code significantly and potentially lead to bugs, as experienced in the upstream tail sampling processor.
-
-This is, of course, a trade-off. The processing throughput is limited by the capacity of a single goroutine, 
-creating a potential bottleneck. This can be alleviated by deploying more instances of the processor with reduced 
-memory allocation per instance (e.g., more nodes, each with less memory). If the bottleneck becomes a significant issue, 
-a future enhancement could involve sharding the processor. This would involve splitting the processing workload by trace 
-ID and maintaining separate caches and states for each shard.
+All shard listeners still access the same caches as each other, so a global lock is employed for any operations that may affect data cross-shard.
+The prime example of an operation like this, is the resizing of the caches, which can be performed by any shard listener, but may delete data
+belonging to a different shard listener. So, a stop-the-world kind of halt occurs briefly while the cache gets resized.
 
 ## Policies, and Policy Evaluation
 
