@@ -4,8 +4,6 @@ import (
 	"fmt"
 
 	"go.opentelemetry.io/collector/component"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/metric"
 
 	"github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/evaluators"
 )
@@ -20,8 +18,6 @@ type policy struct {
 	emitSingleSpanForNotSampled bool
 	// evaluator that decides if a trace is sampled or not by this policy instance.
 	evaluator evaluators.PolicyEvaluator
-	// attribute to use in the telemetry to denote the policy.
-	attribute metric.MeasurementOption
 }
 
 func newPolicies(cfg []PolicyConfig, set component.TelemetrySettings) ([]*policy, error) {
@@ -44,7 +40,6 @@ func newPolicies(cfg []PolicyConfig, set component.TelemetrySettings) ([]*policy
 			policyType:                  policyCfg.Type,
 			emitSingleSpanForNotSampled: policyCfg.EmitSingleSpanForNotSampled,
 			evaluator:                   eval,
-			attribute:                   metric.WithAttributes(attribute.String("policy", policyCfg.Name)),
 		}
 		pols[i] = p
 	}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component/componenttest"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata/metricdatatest"
 
@@ -19,11 +20,13 @@ func TestSetupTelemetry(t *testing.T) {
 	tb, err := metadata.NewTelemetryBuilder(testTel.NewTelemetrySettings())
 	require.NoError(t, err)
 	defer tb.Shutdown()
-	tb.ProcessorAtlassianSamplingCacheReads.Add(context.Background(), 1)
+	require.NoError(t, tb.RegisterProcessorAtlassianSamplingCacheReadsCallback(func(_ context.Context, observer metric.Int64Observer) error {
+		observer.Observe(1)
+		return nil
+	}))
 	tb.ProcessorAtlassianSamplingChanBlockingTime.Record(context.Background(), 1)
 	tb.ProcessorAtlassianSamplingDecisionEvictionTime.Record(context.Background(), 1)
 	tb.ProcessorAtlassianSamplingInternalErrorDroppedSpans.Add(context.Background(), 1)
-	tb.ProcessorAtlassianSamplingOverlyEagerLonelyRootSpanDecisions.Add(context.Background(), 1)
 	tb.ProcessorAtlassianSamplingPolicyDecisions.Add(context.Background(), 1)
 	tb.ProcessorAtlassianSamplingPrimaryCacheSize.Record(context.Background(), 1)
 	tb.ProcessorAtlassianSamplingTraceEvictionTime.Record(context.Background(), 1)
@@ -39,9 +42,6 @@ func TestSetupTelemetry(t *testing.T) {
 		[]metricdata.DataPoint[float64]{{Value: 1}},
 		metricdatatest.IgnoreTimestamp())
 	AssertEqualProcessorAtlassianSamplingInternalErrorDroppedSpans(t, testTel,
-		[]metricdata.DataPoint[int64]{{Value: 1}},
-		metricdatatest.IgnoreTimestamp())
-	AssertEqualProcessorAtlassianSamplingOverlyEagerLonelyRootSpanDecisions(t, testTel,
 		[]metricdata.DataPoint[int64]{{Value: 1}},
 		metricdatatest.IgnoreTimestamp())
 	AssertEqualProcessorAtlassianSamplingPolicyDecisions(t, testTel,

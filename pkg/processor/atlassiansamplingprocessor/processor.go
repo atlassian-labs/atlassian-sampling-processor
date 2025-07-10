@@ -2,7 +2,6 @@ package atlassiansamplingprocessor // import "github.com/atlassian-labs/atlassia
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"sync"
@@ -32,6 +31,7 @@ const (
 	decisionSpanKey   = "atlassiansampling.decision"
 	memTickerInterval = 10 * time.Second
 	traceIDLoggingKey = "traceId"
+	shardIDKey        = "shardid"
 )
 
 var (
@@ -57,19 +57,22 @@ type atlassianSamplingProcessor struct {
 	// nonSampledDecisionCache holds the set of trace IDs that were not sampled, and a struct that contains the policy that
 	// made the not sampled decision and the time the decision was made
 	nonSampledDecisionCache cache.Cache[time.Time]
-	// incomingTraces is where the traces are put when they first arrive to the component
-	incomingTraces chan []*groupedResourceSpans
+	// shards are the channels which the sharded goroutines read incoming data from
+	shards []chan []*groupedTraceData
 	// memRegulator can adjust cache sizes to target a given heap usage.
 	// May be nil, in which case the cache sizes will not be adjusted.
 	memRegulator memory.RegulatorI
 	// memTicker controls how often the memRegulator is called
 	memTicker *time.Ticker
+	// globalLock protects the caches for operations that affect data cross-shard, e.g. resizing the cache.
+	globalLock *sync.RWMutex
 	// regulatorStartTime is the time at which the regulator starts being used to regulate cache sizes
 	regulatorStartTime time.Time
-	// shutdownStart is a chan used to signal to the async goroutine to start shutdown.
-	// The deadline time is passed to the chan, so the async goroutine knows when to time out.
-	shutdownStart   chan time.Time
-	waitGroup       sync.WaitGroup
+	// shutdown is a chan used to signal to the async goroutines to start shutdown. This is
+	// broadcast to the async goroutines by closing the chan.
+	shutdown  chan struct{}
+	waitGroup *sync.WaitGroup
+
 	flushOnShutdown bool
 	compress        bool
 	started         atomic.Bool
@@ -88,13 +91,21 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 		return nil, err
 	}
 
+	shards := make([]chan []*groupedTraceData, cfg.Shards)
+	for i := 0; i < cfg.Shards; i++ {
+		shards[i] = make(chan []*groupedTraceData, cfg.PreprocessBufferSize)
+	}
+
 	asp := &atlassianSamplingProcessor{
 		next:      next,
 		telemetry: telemetry,
 		log:       set.Logger,
 
-		incomingTraces:  make(chan []*groupedResourceSpans),
-		shutdownStart:   make(chan time.Time),
+		shards:     shards,
+		globalLock: &sync.RWMutex{},
+
+		shutdown:        make(chan struct{}),
+		waitGroup:       &sync.WaitGroup{},
 		flushOnShutdown: cfg.FlushOnShutdown,
 		compress:        cfg.CompressionEnabled,
 	}
@@ -140,7 +151,7 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 	asp.memTicker = time.NewTicker(memTickerInterval)
 	if cfg.TargetHeapBytes > 0 {
 		memRegulator, rErr := memory.NewRegulator(
-			cfg.PrimaryCacheSize/2,
+			cfg.PrimaryCacheSize/4,
 			cfg.PrimaryCacheSize,
 			cfg.TargetHeapBytes,
 			memory.GetHeapUsage,
@@ -176,7 +187,14 @@ func (asp *atlassianSamplingProcessor) Start(ctx context.Context, host component
 		return fmt.Errorf("failed to start decider")
 	}
 
-	go asp.consumeChan()
+	for i := 0; i < len(asp.shards); i++ {
+		asp.waitGroup.Add(1)
+		go func() {
+			defer asp.waitGroup.Done()
+			defer asp.log.Info("shardListener() finished", zap.Int(shardIDKey, i))
+			asp.shardListener(i)
+		}()
+	}
 	return nil
 }
 
@@ -193,18 +211,17 @@ func (asp *atlassianSamplingProcessor) Shutdown(parentCtx context.Context) error
 	deadline := time.Now().Add(50 * time.Second)
 	ctx, cancel := context.WithDeadline(parentCtx, deadline)
 	defer cancel()
-	// Need to close chan because if parentCtx is cancelled already, the below select/case never sends the shutdown
-	// signal, resulting in the consumeChan() goroutine to block waiting. Closing the channel forces this to release.
-	defer close(asp.shutdownStart)
 
 	asp.memTicker.Stop()
 
+	// Closing this channel broadcasts a shutdown signal to all shardListeners
+	close(asp.shutdown)
 	select {
-	case asp.shutdownStart <- deadline:
-		asp.waitGroup.Wait()
+	// Sends when shard listeners are done
+	case <-wgWaiter(asp.waitGroup):
 		asp.started.Store(false)
 	case <-ctx.Done():
-		return fmt.Errorf("failed to wait for consumer goroutine to acknowledge shutdown: %w", ctx.Err())
+		return fmt.Errorf("context cancelled while waiting for shard listeners to shutdown: %w", ctx.Err())
 	}
 
 	var err error
@@ -216,58 +233,85 @@ func (asp *atlassianSamplingProcessor) Shutdown(parentCtx context.Context) error
 }
 
 // ConsumeTraces implements the processing interface.
-// This puts on a channel for another goroutine to read, since we want consumption
-// to be synchronized, avoiding tricky code and race conditions.
-// Note for future: If the synchronicity becomes a bottleneck, this component
-// can be sharded similar to how the batch processor is sharded.
+// The main work this function does is to split up the received data by trace ID, and then
+// split up those trace IDs deterministically by shard. Then, it calls the shard with the arranged data.
 func (asp *atlassianSamplingProcessor) ConsumeTraces(ctx context.Context, td ptrace.Traces) error {
 	start := time.Now()
 	defer func() {
 		asp.telemetry.ProcessorAtlassianSamplingChanBlockingTime.Record(ctx, time.Since(start).Nanoseconds())
 	}()
 
-	resSpansGroupedByTraceID := make([]*groupedResourceSpans, 0, td.ResourceSpans().Len())
+	n := len(asp.shards)
+
+	// This is the eventual structure we are building for sending to the shard
+	shardedResourceSpans := make([][]*groupedTraceData, n)
+
 	resourceSpans := td.ResourceSpans()
 	for i := 0; i < resourceSpans.Len(); i++ {
-		resSpansGroupedByTraceID = append(resSpansGroupedByTraceID, &groupedResourceSpans{
-			resource:              resourceSpans.At(i).Resource(),
-			spansGroupedByTraceID: groupSpansByTraceID(resourceSpans.At(i)),
-		})
+		resource := resourceSpans.At(i).Resource()
+		spansByTraceID := groupSpansByTraceID(resourceSpans.At(i))
+
+		asp.earlyDecisionChecks(ctx, resource, spansByTraceID)
+
+		if len(spansByTraceID) == 0 {
+			continue
+		}
+
+		// Shard the traces
+		for id, spans := range spansByTraceID {
+			shardID := shardIDForTrace(id, n)
+			shardedResourceSpans[shardID] = append(shardedResourceSpans[shardID], &groupedTraceData{
+				id:       id,
+				resource: resource,
+				spans:    spans,
+			})
+		}
 	}
 
-	asp.incomingTraces <- resSpansGroupedByTraceID
-	return nil
+	// Send to shards in parallel
+	eg := &errgroup.Group{}
+	for i := range asp.shards {
+		if shardedResourceSpans[i] == nil {
+			continue
+		}
+
+		eg.Go(func() error {
+			select {
+			case asp.shards[i] <- shardedResourceSpans[i]:
+				return nil
+			case <-ctx.Done():
+				return fmt.Errorf("context cancelled while waiting for shards[%d] to receive: %w", i, ctx.Err())
+			}
+		})
+	}
+	return <-egWaiter(eg)
 }
 
-// consumeChan reads the traces from a channel.
-func (asp *atlassianSamplingProcessor) consumeChan() {
-	asp.waitGroup.Add(1)
-	defer asp.waitGroup.Done()
-	defer asp.log.Info("consumeChan() finished")
+// shardListener reads the traces from the specified channel / shard.
+func (asp *atlassianSamplingProcessor) shardListener(shardID int) {
 	ctx := context.Background()
-
 	for {
 		select {
 		// Regular operating case
-		case grsArr := <-asp.incomingTraces:
-			for _, grs := range grsArr {
-				asp.processTraces(ctx, grs)
-			}
+		case gtdArr := <-asp.shards[shardID]:
+			asp.processTraces(ctx, gtdArr)
 		case t := <-asp.memTicker.C:
 			// If ticker signals, call the memory regulator
 			if t.After(asp.regulatorStartTime) && asp.memRegulator != nil {
+				// cache size regulation needs global write lock because it will affect data owned by other shards
+				asp.globalLock.Lock()
 				size := asp.memRegulator.RegulateCacheSize()
+				asp.globalLock.Unlock()
 				asp.telemetry.ProcessorAtlassianSamplingPrimaryCacheSize.Record(ctx, int64(size))
 			}
 		// If shutdown is signaled, process any pending traces and return
-		case deadline := <-asp.shutdownStart:
+		case <-asp.shutdown:
+			deadline := time.Now().Add(50 * time.Second)
 			shutdownCtx, cancel := context.WithDeadline(ctx, deadline)
 			for {
 				select {
-				case grsArr := <-asp.incomingTraces:
-					for _, grs := range grsArr {
-						asp.processTraces(shutdownCtx, grs)
-					}
+				case gtdArr := <-asp.shards[shardID]:
+					asp.processTraces(shutdownCtx, gtdArr)
 				case <-shutdownCtx.Done():
 					cancel()
 					asp.log.Warn("context cancelled before we could process all incoming traces", zap.Error(shutdownCtx.Err()))
@@ -281,14 +325,19 @@ func (asp *atlassianSamplingProcessor) consumeChan() {
 	}
 }
 
-func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, grs *groupedResourceSpans) {
-	for id, spans := range grs.spansGroupedByTraceID {
-		if asp.cachedDecision(ctx, id, grs.resource, spans) {
+func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, gtdArr []*groupedTraceData) {
+	asp.globalLock.RLock()
+	defer asp.globalLock.RUnlock()
+	for _, gtd := range gtdArr {
+		id := gtd.id
+		resource := gtd.resource
+		spans := gtd.spans
+		if asp.cachedDecision(ctx, id, resource, spans) {
 			continue
 		}
 
 		currentTrace := ptrace.NewTraces()
-		appendToTraces(currentTrace, grs.resource, spans)
+		appendToTraces(currentTrace, resource, spans)
 
 		td, err := tracedata.NewTraceData(time.Now(), currentTrace, priority.Unspecified, asp.compress)
 		if err != nil {
@@ -353,6 +402,29 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, grs *g
 	}
 }
 
+func (asp *atlassianSamplingProcessor) earlyDecisionChecks(ctx context.Context, resource pcommon.Resource, spansByTraceID spansGroupedByTraceID) {
+	for id, spans := range spansByTraceID {
+		_, isDecisionSpan := resource.Attributes().Get(decisionSpanKey)
+		// decision spans must be dealt with in synchronized path, because they cause cache writes
+		if isDecisionSpan {
+			continue
+		}
+
+		// checks decision caches, exports data if sampled. If decision is in cache,
+		// deletes this trace from the map, as it no longer needs later processing.
+		decisionFromCache := asp.safeCheckDecisionCaches(id)
+
+		if decisionFromCache == evaluators.Sampled {
+			tracesToExport := ptrace.NewTraces()
+			appendToTraces(tracesToExport, resource, spans)
+			asp.sendSampledTraceData(ctx, tracesToExport)
+			delete(spansByTraceID, id)
+		} else if decisionFromCache == evaluators.NotSampled {
+			delete(spansByTraceID, id)
+		}
+	}
+}
+
 // cachedDecision checks to see if a decision has already been made for this trace,
 // and sends/drops if a pre-existing decision exists.
 // If the incoming span is a decision span, and the decision conflicts with the current decision caches,
@@ -363,11 +435,10 @@ func (asp *atlassianSamplingProcessor) cachedDecision(
 	resource pcommon.Resource,
 	spans []spanAndScope,
 ) bool {
-	decision, isDecisionSpan := resource.Attributes().Get(decisionSpanKey)
+	decisionFromDecisionSpan, isDecisionSpan := resource.Attributes().Get(decisionSpanKey)
 
-	// check decision caches
-	if _, ok := asp.sampledDecisionCache.Get(id); ok {
-		// export if not decision span
+	decisionFromCache := asp.safeCheckDecisionCaches(id)
+	if decisionFromCache == evaluators.Sampled {
 		if !isDecisionSpan {
 			// We can palm this expensive operation off to a goroutine, since we know
 			// there won't be anymore cache accesses that must be synchronized.
@@ -378,8 +449,7 @@ func (asp *atlassianSamplingProcessor) cachedDecision(
 			}()
 		}
 		return true
-	}
-	if _, ok := asp.nonSampledDecisionCache.Get(id); ok {
+	} else if decisionFromCache == evaluators.NotSampled {
 		return true
 	}
 
@@ -388,7 +458,7 @@ func (asp *atlassianSamplingProcessor) cachedDecision(
 	}
 
 	// This is a decision span, handle it
-	if decision.Bool() {
+	if decisionFromDecisionSpan.Bool() {
 		if td, ok := asp.traceData.Get(id); ok {
 			cachedData, err := td.GetTraces()
 			if err != nil {
@@ -402,6 +472,20 @@ func (asp *atlassianSamplingProcessor) cachedDecision(
 		asp.releaseNotSampledTrace(ctx, id, nil)
 	}
 	return true
+}
+
+// safeCheckDecisionCaches is a concurrency safe check of a decision cache for the given trace ID, because it strictly
+// reads the cache and does not write to it. The cache.Cache implementation must also be concurrency safe for this to hold.
+func (asp *atlassianSamplingProcessor) safeCheckDecisionCaches(
+	id pcommon.TraceID) evaluators.Decision {
+
+	if _, ok := asp.sampledDecisionCache.Get(id); ok {
+		return evaluators.Sampled
+	}
+	if _, ok := asp.nonSampledDecisionCache.Get(id); ok {
+		return evaluators.NotSampled
+	}
+	return evaluators.Unspecified
 }
 
 // sendSampledTraceData sends the given trace data to the next component in the pipeline.
@@ -525,7 +609,7 @@ func (asp *atlassianSamplingProcessor) flushAll(ctx context.Context) error {
 	case <-ctx.Done():
 		return fmt.Errorf("context finished while waiting for goroutines to complete, "+
 			"%d out of %d traces successffuly sent: %w", tracesSent.Load(), valsLen, context.Cause(ctx))
-	case err := <-groupWaiter(group):
+	case err := <-egWaiter(group):
 		if err != nil {
 			return fmt.Errorf("error waiting on errgroup, %d out of %d traces successfully sent: %w",
 				tracesSent.Load(), valsLen, err)
@@ -564,7 +648,7 @@ func (asp *atlassianSamplingProcessor) cacheEvictionCallback(cacheName string, i
 		// metrics being polluted with explicit cache deletions from traces being sampled and exported.
 		asp.telemetry.ProcessorAtlassianSamplingTraceEvictionTime.
 			Record(ctx, time.Since(td.Metadata.ArrivalTime).Seconds(),
-				metric.WithAttributes(attribute.String("cache", cacheName)))
+				metric.WithAttributeSet(attribute.NewSet(attribute.String("cache", cacheName))))
 	}
 }
 
@@ -588,14 +672,4 @@ func (asp *atlassianSamplingProcessor) reportTraceDataErr(ctx context.Context, e
 	fields = append(fields, zap.Error(err), zap.Int64("spanCount", spanCount))
 	asp.log.Error("failed to perform operation on TraceData", fields...)
 	asp.telemetry.ProcessorAtlassianSamplingInternalErrorDroppedSpans.Add(ctx, spanCount)
-}
-
-// To generate a random span ID for the placeholder trace
-func generateRandomSpanID() pcommon.SpanID {
-	var id [8]byte
-	_, err := rand.Read(id[:])
-	if err != nil {
-		panic("failed to generate random span ID: " + err.Error())
-	}
-	return id
 }

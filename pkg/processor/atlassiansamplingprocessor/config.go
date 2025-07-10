@@ -9,6 +9,9 @@ import (
 )
 
 type Config struct {
+	// Shards controls how many goroutines consume the data incoming to the processor, sharded by trace ID. Default = 1.
+	Shards int `mapstructure:"shards"`
+
 	// PolicyConfig sets the tail-based sampling policy which makes a sampling decision
 	// for a given trace when requested.
 	PolicyConfig []PolicyConfig `mapstructure:"policies"`
@@ -37,18 +40,25 @@ type Config struct {
 
 	// CompressionEnabled compresses trace data in the primary and secondary caches if enabled
 	CompressionEnabled bool `mapstructure:"compression_enabled"`
+
+	// PreprocessBufferSize specifies the size of the chan that queues incoming trace data to be processed by the main loop.
+	// Default is 0, in which case an unbuffered channel is used.
+	PreprocessBufferSize int `mapstructure:"preprocess_buffer_size"`
 }
 
 var (
 	primaryCacheSizeError   = errors.New("primary_cache_size must be greater than 0")
 	secondaryCacheSizeError = errors.New("secondary_cache_size must be greater than 0 and less than 50% of primary_cache_size")
 	duplicatePolicyName     = errors.New("duplicate policy names found in sampling policy config")
+	invalidBufferSize       = errors.New("preprocess_buffer_size must be >= 0")
+	invalidShardCount       = errors.New("shards must be > 0")
 )
 
 var _ component.Config = (*Config)(nil)
 
 func createDefaultConfig() component.Config {
 	return &Config{
+		Shards:             1,
 		PrimaryCacheSize:   1000,
 		SecondaryCacheSize: 100,
 		DecisionCacheCfg: DecisionCacheCfg{
@@ -79,6 +89,14 @@ func (cfg *Config) Validate() (errors error) {
 
 	if cfg.SecondaryCacheSize <= 0 || cfg.SecondaryCacheSize > cfg.PrimaryCacheSize/2 {
 		errors = multierr.Append(errors, secondaryCacheSizeError)
+	}
+
+	if cfg.PreprocessBufferSize < 0 {
+		errors = multierr.Append(errors, invalidBufferSize)
+	}
+
+	if cfg.Shards <= 0 {
+		errors = multierr.Append(errors, invalidShardCount)
 	}
 
 	err := validateUniquePolicyNames(cfg.PolicyConfig)

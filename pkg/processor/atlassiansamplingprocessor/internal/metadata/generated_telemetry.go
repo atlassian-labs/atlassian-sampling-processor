@@ -3,11 +3,13 @@
 package metadata
 
 import (
+	"context"
 	"errors"
 	"sync"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/embedded"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -22,19 +24,18 @@ func Tracer(settings component.TelemetrySettings) trace.Tracer {
 // TelemetryBuilder provides an interface for components to report telemetry
 // as defined in metadata and user config.
 type TelemetryBuilder struct {
-	meter                                                        metric.Meter
-	mu                                                           sync.Mutex
-	registrations                                                []metric.Registration
-	ProcessorAtlassianSamplingCacheReads                         metric.Int64Counter
-	ProcessorAtlassianSamplingChanBlockingTime                   metric.Int64Histogram
-	ProcessorAtlassianSamplingDecisionEvictionTime               metric.Float64Gauge
-	ProcessorAtlassianSamplingInternalErrorDroppedSpans          metric.Int64Counter
-	ProcessorAtlassianSamplingOverlyEagerLonelyRootSpanDecisions metric.Int64Counter
-	ProcessorAtlassianSamplingPolicyDecisions                    metric.Int64Counter
-	ProcessorAtlassianSamplingPrimaryCacheSize                   metric.Int64Gauge
-	ProcessorAtlassianSamplingTraceEvictionTime                  metric.Float64Gauge
-	ProcessorAtlassianSamplingTracesNotSampled                   metric.Int64Counter
-	ProcessorAtlassianSamplingTracesSampled                      metric.Int64Counter
+	meter                                               metric.Meter
+	mu                                                  sync.Mutex
+	registrations                                       []metric.Registration
+	ProcessorAtlassianSamplingCacheReads                metric.Int64ObservableCounter
+	ProcessorAtlassianSamplingChanBlockingTime          metric.Int64Histogram
+	ProcessorAtlassianSamplingDecisionEvictionTime      metric.Float64Gauge
+	ProcessorAtlassianSamplingInternalErrorDroppedSpans metric.Int64Counter
+	ProcessorAtlassianSamplingPolicyDecisions           metric.Int64Counter
+	ProcessorAtlassianSamplingPrimaryCacheSize          metric.Int64Gauge
+	ProcessorAtlassianSamplingTraceEvictionTime         metric.Float64Gauge
+	ProcessorAtlassianSamplingTracesNotSampled          metric.Int64Counter
+	ProcessorAtlassianSamplingTracesSampled             metric.Int64Counter
 }
 
 // TelemetryBuilderOption applies changes to default builder.
@@ -46,6 +47,31 @@ type telemetryBuilderOptionFunc func(mb *TelemetryBuilder)
 
 func (tbof telemetryBuilderOptionFunc) apply(mb *TelemetryBuilder) {
 	tbof(mb)
+}
+
+// RegisterProcessorAtlassianSamplingCacheReadsCallback sets callback for observable ProcessorAtlassianSamplingCacheReads metric.
+func (builder *TelemetryBuilder) RegisterProcessorAtlassianSamplingCacheReadsCallback(cb metric.Int64Callback) error {
+	reg, err := builder.meter.RegisterCallback(func(ctx context.Context, o metric.Observer) error {
+		cb(ctx, &observerInt64{inst: builder.ProcessorAtlassianSamplingCacheReads, obs: o})
+		return nil
+	}, builder.ProcessorAtlassianSamplingCacheReads)
+	if err != nil {
+		return err
+	}
+	builder.mu.Lock()
+	defer builder.mu.Unlock()
+	builder.registrations = append(builder.registrations, reg)
+	return nil
+}
+
+type observerInt64 struct {
+	embedded.Int64Observer
+	inst metric.Int64Observable
+	obs  metric.Observer
+}
+
+func (oi *observerInt64) Observe(value int64, opts ...metric.ObserveOption) {
+	oi.obs.ObserveInt64(oi.inst, value, opts...)
 }
 
 // Shutdown unregister all registered callbacks for async instruments.
@@ -66,7 +92,7 @@ func NewTelemetryBuilder(settings component.TelemetrySettings, options ...Teleme
 	}
 	builder.meter = Meter(settings)
 	var err, errs error
-	builder.ProcessorAtlassianSamplingCacheReads, err = builder.meter.Int64Counter(
+	builder.ProcessorAtlassianSamplingCacheReads, err = builder.meter.Int64ObservableCounter(
 		"otelcol_processor_atlassian_sampling_cache_reads",
 		metric.WithDescription("Amount of times a cache was read from"),
 		metric.WithUnit("{accesses}"),
@@ -76,7 +102,7 @@ func NewTelemetryBuilder(settings component.TelemetrySettings, options ...Teleme
 		"otelcol_processor_atlassian_sampling_chan_blocking_time",
 		metric.WithDescription("Amount of time spent blocking on the chan send in ConsumeTraces()"),
 		metric.WithUnit("ns"),
-		metric.WithExplicitBucketBoundaries([]float64{50000, 100000, 500000, 1e+06, 5e+06, 1e+07, 5e+07, 1e+08, 1e+09, 1.5e+09}...),
+		metric.WithExplicitBucketBoundaries([]float64{500000, 1e+06, 5e+06, 1e+07, 5e+07, 1e+08, 1e+09, 1.5e+09, 3e+09, 5e+09}...),
 	)
 	errs = errors.Join(errs, err)
 	builder.ProcessorAtlassianSamplingDecisionEvictionTime, err = builder.meter.Float64Gauge(
@@ -88,12 +114,6 @@ func NewTelemetryBuilder(settings component.TelemetrySettings, options ...Teleme
 	builder.ProcessorAtlassianSamplingInternalErrorDroppedSpans, err = builder.meter.Int64Counter(
 		"otelcol_processor_atlassian_sampling_internal_error_dropped_spans",
 		metric.WithDescription("Number of spans that have been dropped due to an internal error"),
-		metric.WithUnit("{spans}"),
-	)
-	errs = errors.Join(errs, err)
-	builder.ProcessorAtlassianSamplingOverlyEagerLonelyRootSpanDecisions, err = builder.meter.Int64Counter(
-		"otelcol_processor_atlassian_sampling_overly_eager_lonely_root_span_decisions",
-		metric.WithDescription("Number of spans that have been aggressively sampled out by root span policy"),
 		metric.WithUnit("{spans}"),
 	)
 	errs = errors.Join(errs, err)
