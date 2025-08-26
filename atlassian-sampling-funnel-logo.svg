@@ -1,0 +1,36 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle for containment -->
+  <circle cx="100" cy="100" r="90" fill="none" stroke="#E6F2FF" stroke-width="2" opacity="0.3"/>
+  
+  <!-- Main funnel shape representing sampling -->
+  <path d="M 60 40 L 140 40 L 120 100 L 80 100 Z" fill="#0052CC" opacity="0.9"/>
+  
+  <!-- Data points entering the funnel (many) -->
+  <circle cx="70" cy="25" r="3" fill="#36B37E"/>
+  <circle cx="85" cy="20" r="3" fill="#36B37E"/>
+  <circle cx="100" cy="25" r="3" fill="#36B37E"/>
+  <circle cx="115" cy="20" r="3" fill="#36B37E"/>
+  <circle cx="130" cy="25" r="3" fill="#36B37E"/>
+  
+  <!-- Additional scattered input data points -->
+  <circle cx="75" cy="35" r="2" fill="#36B37E" opacity="0.7"/>
+  <circle cx="95" cy="30" r="2" fill="#36B37E" opacity="0.7"/>
+  <circle cx="105" cy="35" r="2" fill="#36B37E" opacity="0.7"/>
+  <circle cx="125" cy="30" r="2" fill="#36B37E" opacity="0.7"/>
+  
+  <!-- Funnel neck/processing area -->
+  <rect x="85" y="100" width="30" height="40" fill="#0052CC" opacity="0.8"/>
+  
+  <!-- Selected output data (fewer, larger) -->
+  <circle cx="90" cy="160" r="4" fill="#FFAB00"/>
+  <circle cx="110" cy="165" r="4" fill="#FFAB00"/>
+  
+  <!-- Processing indicator lines -->
+  <line x1="70" y1="70" x2="85" y2="85" stroke="#0052CC" stroke-width="1" opacity="0.5"/>
+  <line x1="130" y1="70" x2="115" y2="85" stroke="#0052CC" stroke-width="1" opacity="0.5"/>
+  
+  <!-- Cache layers indicator -->
+  <rect x="145" y="120" width="35" height="8" rx="4" fill="#36B37E" opacity="0.6"/>
+  <rect x="145" y="135" width="35" height="8" rx="4" fill="#36B37E" opacity="0.4"/>
+  <rect x="145" y="150" width="35" height="8" rx="4" fill="#36B37E" opacity="0.2"/>
+</svg>

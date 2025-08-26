@@ -1,0 +1,56 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="90" fill="none" stroke="#E6F2FF" stroke-width="2" opacity="0.3"/>
+  
+  <!-- Primary cache layer (largest, most prominent) -->
+  <ellipse cx="100" cy="120" rx="60" ry="15" fill="#0052CC" opacity="0.9"/>
+  <ellipse cx="100" cy="115" rx="60" ry="15" fill="#0052CC"/>
+  
+  <!-- Secondary cache layer (smaller, lower priority) -->
+  <ellipse cx="100" cy="90" rx="45" ry="12" fill="#36B37E" opacity="0.8"/>
+  <ellipse cx="100" cy="87" rx="45" ry="12" fill="#36B37E"/>
+  
+  <!-- Decision cache layers (smaller, at top) -->
+  <ellipse cx="100" cy="60" rx="35" ry="8" fill="#FFAB00" opacity="0.7"/>
+  <ellipse cx="100" cy="58" rx="35" ry="8" fill="#FFAB00"/>
+  
+  <ellipse cx="100" cy="45" rx="30" ry="6" fill="#FFAB00" opacity="0.5"/>
+  <ellipse cx="100" cy="44" rx="30" ry="6" fill="#FFAB00" opacity="0.7"/>
+  
+  <!-- Data flow arrows showing movement between layers -->
+  <path d="M 85 75 L 90 85" stroke="#666" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <path d="M 115 75 L 110 85" stroke="#666" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <path d="M 85 105 L 90 115" stroke="#666" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <path d="M 115 105 L 110 115" stroke="#666" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  
+  <!-- Data points/traces being processed -->
+  <circle cx="70" cy="30" r="3" fill="#36B37E"/>
+  <circle cx="100" cy="25" r="3" fill="#36B37E"/>
+  <circle cx="130" cy="30" r="3" fill="#36B37E"/>
+  
+  <!-- LRU eviction indicator (data flowing out) -->
+  <path d="M 160 120 L 175 125" stroke="#FF5630" stroke-width="2" fill="none" marker-end="url(#arrowhead)" opacity="0.6"/>
+  <circle cx="180" cy="127" r="2" fill="#FF5630" opacity="0.6"/>
+  
+  <!-- Memory optimization indicators -->
+  <rect x="20" y="110" width="15" height="3" rx="1.5" fill="#0052CC" opacity="0.3"/>
+  <rect x="20" y="115" width="12" height="3" rx="1.5" fill="#0052CC" opacity="0.5"/>
+  <rect x="20" y="120" width="18" height="3" rx="1.5" fill="#0052CC" opacity="0.4"/>
+  
+  <!-- Arrow marker definition -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+            refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
+    </marker>
+  </defs>
+  
+  <!-- Processing speed indicators -->
+  <line x1="40" y1="50" x2="55" y2="50" stroke="#FFAB00" stroke-width="2" opacity="0.6"/>
+  <line x1="145" y1="50" x2="160" y2="50" stroke="#FFAB00" stroke-width="2" opacity="0.6"/>
+  
+  <!-- Cache size indicators -->
+  <circle cx="100" cy="170" r="2" fill="#0052CC" opacity="0.3"/>
+  <circle cx="90" cy="175" r="1.5" fill="#36B37E" opacity="0.3"/>
+  <circle cx="110" cy="175" r="1.5" fill="#FFAB00" opacity="0.3"/>
+</svg>

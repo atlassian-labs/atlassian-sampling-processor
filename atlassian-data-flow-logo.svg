@@ -1,0 +1,42 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="90" fill="none" stroke="#E6F2FF" stroke-width="2" opacity="0.3"/>
+  
+  <!-- Main flowing data stream -->
+  <path d="M 20 100 Q 60 60, 100 100 Q 140 140, 180 100" 
+        fill="none" stroke="#0052CC" stroke-width="8" stroke-linecap="round"/>
+  
+  <!-- Secondary flow lines -->
+  <path d="M 30 80 Q 70 50, 100 80 Q 130 110, 170 80" 
+        fill="none" stroke="#36B37E" stroke-width="4" stroke-linecap="round" opacity="0.7"/>
+  
+  <path d="M 30 120 Q 70 150, 100 120 Q 130 90, 170 120" 
+        fill="none" stroke="#36B37E" stroke-width="4" stroke-linecap="round" opacity="0.7"/>
+  
+  <!-- Processing nodes/decision points -->
+  <circle cx="60" cy="85" r="8" fill="#0052CC"/>
+  <circle cx="100" cy="100" r="12" fill="#FFAB00"/>
+  <circle cx="140" cy="115" r="8" fill="#0052CC"/>
+  
+  <!-- Data particles along the flow -->
+  <circle cx="40" cy="95" r="3" fill="#36B37E"/>
+  <circle cx="80" cy="75" r="3" fill="#36B37E"/>
+  <circle cx="120" cy="125" r="3" fill="#36B37E"/>
+  <circle cx="160" cy="105" r="3" fill="#36B37E"/>
+  
+  <!-- Smaller processing indicators -->
+  <circle cx="50" cy="70" r="2" fill="#FFAB00" opacity="0.8"/>
+  <circle cx="110" cy="85" r="2" fill="#FFAB00" opacity="0.8"/>
+  <circle cx="150" cy="130" r="2" fill="#FFAB00" opacity="0.8"/>
+  
+  <!-- Flow direction indicators -->
+  <polygon points="170,95 180,100 170,105" fill="#0052CC" opacity="0.6"/>
+  <polygon points="160,75 170,80 160,85" fill="#36B37E" opacity="0.6"/>
+  <polygon points="160,115 170,120 160,125" fill="#36B37E" opacity="0.6"/>
+  
+  <!-- Abstract geometric elements suggesting processing -->
+  <rect x="90" y="40" width="20" height="4" rx="2" fill="#0052CC" opacity="0.4"/>
+  <rect x="85" y="50" width="30" height="4" rx="2" fill="#36B37E" opacity="0.4"/>
+  <rect x="90" y="155" width="20" height="4" rx="2" fill="#0052CC" opacity="0.4"/>
+  <rect x="85" y="145" width="30" height="4" rx="2" fill="#36B37E" opacity="0.4"/>
+</svg>
