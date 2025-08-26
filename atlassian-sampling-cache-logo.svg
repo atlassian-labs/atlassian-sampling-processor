@@ -1,0 +1,32 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <circle cx="60" cy="60" r="55" fill="#0052CC" opacity="0.06"/>
+  
+  <!-- Primary cache layer (largest) -->
+  <rect x="25" y="70" width="70" height="12" rx="6" fill="#0052CC" opacity="0.9"/>
+  
+  <!-- Secondary cache layer (smaller) -->
+  <rect x="35" y="55" width="50" height="10" rx="5" fill="#0052CC" opacity="0.7"/>
+  
+  <!-- Decision caches (top layers) -->
+  <rect x="40" y="42" width="40" height="8" rx="4" fill="#36B37E" opacity="0.8"/>
+  <rect x="45" y="30" width="30" height="8" rx="4" fill="#36B37E" opacity="0.6"/>
+  
+  <!-- Data flow arrows -->
+  <path d="M30 20 L35 25 L30 30 M35 25 L50 25" stroke="#FFAB00" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M70 20 L75 25 L70 30 M75 25 L85 25" stroke="#FFAB00" stroke-width="2" fill="none" stroke-linecap="round"/>
+  
+  <!-- Memory optimization indicator -->
+  <polygon points="60,15 65,25 55,25" fill="#FFAB00"/>
+  
+  <!-- Compression indicator (zigzag pattern) -->
+  <path d="M15 60 L20 55 L25 65 L30 55 L35 65" stroke="#36B37E" stroke-width="2" fill="none" stroke-linecap="round"/>
+  
+  <!-- Output flow -->
+  <path d="M60 85 L60 95 M55 90 L60 95 L65 90" stroke="#0052CC" stroke-width="2" fill="none" stroke-linecap="round"/>
+  
+  <!-- Performance indicators (small dots) -->
+  <circle cx="95" cy="45" r="1.5" fill="#36B37E"/>
+  <circle cx="95" cy="55" r="1.5" fill="#0052CC"/>
+  <circle cx="95" cy="65" r="1.5" fill="#FFAB00"/>
+</svg>

@@ -1,0 +1,28 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <circle cx="60" cy="60" r="55" fill="#0052CC" opacity="0.08"/>
+  
+  <!-- Trace paths (curved lines representing data flow) -->
+  <path d="M20 30 Q40 20, 60 30 T100 25" stroke="#36B37E" stroke-width="2" fill="none" opacity="0.7"/>
+  <path d="M20 45 Q45 35, 70 45 T100 40" stroke="#36B37E" stroke-width="2" fill="none" opacity="0.7"/>
+  <path d="M20 60 Q50 50, 80 60 T100 55" stroke="#36B37E" stroke-width="2" fill="none" opacity="0.7"/>
+  <path d="M20 75 Q40 85, 60 75 T100 80" stroke="#36B37E" stroke-width="2" fill="none" opacity="0.4"/>
+  <path d="M20 90 Q45 100, 70 90 T100 95" stroke="#36B37E" stroke-width="2" fill="none" opacity="0.4"/>
+  
+  <!-- Decision diamond (sampling decision point) -->
+  <polygon points="60,45 75,60 60,75 45,60" fill="#0052CC"/>
+  
+  <!-- Selected traces (thicker lines after decision) -->
+  <path d="M75 30 L95 25" stroke="#0052CC" stroke-width="4" stroke-linecap="round"/>
+  <path d="M75 45 L95 40" stroke="#0052CC" stroke-width="4" stroke-linecap="round"/>
+  <path d="M75 60 L95 55" stroke="#0052CC" stroke-width="4" stroke-linecap="round"/>
+  
+  <!-- Rejected traces (faded) -->
+  <path d="M75 75 L95 80" stroke="#FFAB00" stroke-width="2" stroke-linecap="round" opacity="0.3"/>
+  <path d="M75 90 L95 95" stroke="#FFAB00" stroke-width="2" stroke-linecap="round" opacity="0.3"/>
+  
+  <!-- Priority indicators -->
+  <circle cx="85" cy="27" r="2" fill="#36B37E"/>
+  <circle cx="85" cy="42" r="2" fill="#0052CC"/>
+  <circle cx="85" cy="57" r="2" fill="#FFAB00"/>
+</svg>
