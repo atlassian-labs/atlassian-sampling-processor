@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Sampling funnel mark">
+  <defs>
+    <style>
+      .blue { fill: #0052CC; }
+      .green { fill: #36B37E; }
+    </style>
+  </defs>
+  <!-- Funnel sides using negative space to imply selection narrowing -->
+  <path class="blue" d="M24 16h28l12 24-24 72H24z"/>
+  <path class="blue" d="M104 16H76L64 40l24 72h16z"/>
+  <!-- Selected trace as a droplet at the bottom -->
+  <circle class="green" cx="64" cy="116" r="8"/>
+</svg>

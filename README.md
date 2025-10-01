@@ -1,3 +1,10 @@
+<!-- Project logos -->
+<p align="center">
+  <img src="./atlassian-sampling-mark-1.svg" alt="Atlassian Sampling Processor logo v1" height="96" />
+  <img src="./atlassian-sampling-mark-2.svg" alt="Atlassian Sampling Processor logo v2" height="96" />
+  <img src="./atlassian-sampling-mark-3.svg" alt="Atlassian Sampling Processor logo v3" height="96" />
+</p>
+
 # atlassian-sampling-processor 
 
 This repo contains the source code for the Atlassian Sampling Processor, a tail-based sampler

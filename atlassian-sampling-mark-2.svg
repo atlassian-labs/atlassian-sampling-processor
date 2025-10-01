@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Layered caches with pass-through channel">
+  <defs>
+    <style>
+      .blue { fill: #0052CC; }
+      .green { fill: #36B37E; }
+    </style>
+    <mask id="slot">
+      <rect x="0" y="0" width="128" height="128" fill="#fff"/>
+      <!-- Vertical negative channel -->
+      <rect x="58" y="16" width="12" height="84" rx="6" fill="#000"/>
+    </mask>
+  </defs>
+  <!-- Three cache layers -->
+  <g mask="url(#slot)">
+    <rect class="blue" x="16" y="28" width="96" height="16" rx="8"/>
+    <rect class="blue" x="16" y="56" width="96" height="16" rx="8"/>
+    <rect class="blue" x="16" y="84" width="96" height="16" rx="8"/>
+  </g>
+  <!-- Sampled output emerging from channel -->
+  <circle class="green" cx="64" cy="112" r="8"/>
+</svg>

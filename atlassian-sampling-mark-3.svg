@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Sampling proportion ring">
+  <defs>
+    <style>
+      .blue-stroke { fill: none; stroke: #0052CC; stroke-width: 12; stroke-linecap: round; }
+      .green { fill: #36B37E; }
+    </style>
+  </defs>
+  <!-- Donut ring representing the universe of traces -->
+  <circle class="blue-stroke" cx="64" cy="64" r="38"/>
+  <!-- Sampled sector (approx 20%) -->
+  <path class="green" d="M64 64 L64 20 A44 44 0 0 1 100 36 Z"/>
+</svg>
