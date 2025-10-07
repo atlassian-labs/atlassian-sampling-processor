@@ -1,0 +1,23 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Abstract flow representing trace processing -->
+  <defs>
+    <linearGradient id="flowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#0052CC;stop-opacity:0.8" />
+      <stop offset="50%" style="stop-color:#4C9AFF;stop-opacity:0.6" />
+      <stop offset="100%" style="stop-color:#36B37E;stop-opacity:0.9" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main flow streams -->
+  <path d="M 10 30 Q 30 20, 50 30 Q 70 40, 90 30" stroke="url(#flowGrad)" stroke-width="8" fill="none" opacity="0.7"/>
+  <path d="M 10 45 Q 30 35, 50 45 Q 70 55, 90 45" stroke="url(#flowGrad)" stroke-width="6" fill="none" opacity="0.5"/>
+  <path d="M 10 60 Q 30 50, 50 60 Q 70 70, 90 60" stroke="url(#flowGrad)" stroke-width="4" fill="none" opacity="0.3"/>
+  
+  <!-- Decision nodes - circles representing sampling decisions -->
+  <circle cx="25" cy="30" r="4" fill="#0052CC" opacity="0.8"/>
+  <circle cx="50" cy="35" r="5" fill="#4C9AFF" opacity="0.9"/>
+  <circle cx="75" cy="40" r="4" fill="#36B37E"/>
+  
+  <!-- Processing efficiency indicator -->
+  <path d="M 15 75 L 35 85 L 25 75 Z" fill="#36B37E" opacity="0.6"/>
+</svg>
