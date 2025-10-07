@@ -1,0 +1,39 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer ring representing the overall system -->
+  <circle cx="60" cy="60" r="55" fill="none" stroke="#0052CC" stroke-width="2"/>
+  
+  <!-- Primary cache layer (largest) -->
+  <rect x="25" y="45" width="70" height="8" rx="4" fill="#0052CC" opacity="0.8"/>
+  
+  <!-- Secondary cache layer (smaller) -->
+  <rect x="30" y="56" width="60" height="8" rx="4" fill="#36B37E" opacity="0.7"/>
+  
+  <!-- Decision caches (two small rectangles) -->
+  <rect x="35" y="67" width="20" height="6" rx="3" fill="#FFAB00"/>
+  <rect x="65" y="67" width="20" height="6" rx="3" fill="#DE350B"/>
+  
+  <!-- Data flow arrows -->
+  <g fill="none" stroke="#8993A4" stroke-width="1.5">
+    <!-- Input arrow -->
+    <path d="M20 30 L40 30" marker-end="url(#arrowhead)"/>
+    <!-- Processing arrows between layers -->
+    <path d="M60 35 L60 42" marker-end="url(#arrowhead)"/>
+    <path d="M60 77 L60 85" marker-end="url(#arrowhead)"/>
+    <!-- Output arrow -->
+    <path d="M80 90 L100 90" marker-end="url(#arrowhead)"/>
+  </g>
+  
+  <!-- Arrow marker definition -->
+  <defs>
+    <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
+      <polygon points="0 0, 6 2, 0 4" fill="#8993A4"/>
+    </marker>
+  </defs>
+  
+  <!-- Small indicators for compression -->
+  <g fill="#0052CC" opacity="0.4">
+    <rect x="28" y="47" width="2" height="4"/>
+    <rect x="32" y="47" width="2" height="4"/>
+    <rect x="36" y="47" width="2" height="4"/>
+  </g>
+</svg>

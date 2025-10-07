@@ -1,0 +1,43 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="60" cy="60" r="55" fill="none" stroke="#0052CC" stroke-width="2"/>
+  
+  <!-- Root decision node -->
+  <circle cx="60" cy="30" r="6" fill="#0052CC"/>
+  
+  <!-- Policy evaluation nodes -->
+  <circle cx="40" cy="50" r="4" fill="#36B37E"/>
+  <circle cx="60" cy="50" r="4" fill="#36B37E"/>
+  <circle cx="80" cy="50" r="4" fill="#36B37E"/>
+  
+  <!-- Decision outcome nodes -->
+  <circle cx="30" cy="75" r="5" fill="#DE350B"/>  <!-- Not Sampled -->
+  <circle cx="50" cy="75" r="5" fill="#FFAB00"/>  <!-- Pending/Low Priority -->
+  <circle cx="70" cy="75" r="5" fill="#36B37E"/>  <!-- Sampled -->
+  <circle cx="90" cy="75" r="3" fill="#8993A4"/>  <!-- Cache -->
+  
+  <!-- Connection lines -->
+  <g stroke="#8993A4" stroke-width="1.5" fill="none">
+    <!-- From root to policies -->
+    <line x1="55" y1="35" x2="42" y2="46"/>
+    <line x1="60" y1="36" x2="60" y2="44"/>
+    <line x1="65" y1="35" x2="78" y2="46"/>
+    
+    <!-- From policies to decisions -->
+    <line x1="38" y1="53" x2="32" y2="70"/>
+    <line x1="58" y1="53" x2="52" y2="70"/>
+    <line x1="62" y1="53" x2="68" y2="70"/>
+    <line x1="82" y1="53" x2="88" y2="72"/>
+  </g>
+  
+  <!-- Priority indicators (small triangles) -->
+  <g fill="#0052CC" opacity="0.6">
+    <polygon points="38,48 42,48 40,45"/>
+    <polygon points="58,48 62,48 60,45"/>
+    <polygon points="78,48 82,48 80,45"/>
+  </g>
+  
+  <!-- Data flow indicator at top -->
+  <rect x="55" y="15" width="10" height="2" rx="1" fill="#DFE1E6"/>
+  <polygon points="60,10 65,15 55,15" fill="#DFE1E6"/>
+</svg>

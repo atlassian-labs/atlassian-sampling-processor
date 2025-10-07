@@ -1,0 +1,32 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="60" cy="60" r="55" fill="none" stroke="#0052CC" stroke-width="2"/>
+  
+  <!-- Input flow lines (many traces coming in) -->
+  <g stroke="#DFE1E6" stroke-width="1.5" fill="none">
+    <line x1="10" y1="35" x2="35" y2="35"/>
+    <line x1="10" y1="45" x2="35" y2="45"/>
+    <line x1="10" y1="55" x2="35" y2="55"/>
+    <line x1="10" y1="65" x2="35" y2="65"/>
+    <line x1="10" y1="75" x2="35" y2="75"/>
+    <line x1="10" y1="85" x2="35" y2="85"/>
+  </g>
+  
+  <!-- Central processor diamond (sampling decision) -->
+  <polygon points="60,40 75,60 60,80 45,60" fill="#0052CC"/>
+  
+  <!-- Output flow lines (fewer, sampled traces) -->
+  <g stroke="#36B37E" stroke-width="2" fill="none">
+    <line x1="85" y1="50" x2="110" y2="50"/>
+    <line x1="85" y1="60" x2="110" y2="60"/>
+    <line x1="85" y1="70" x2="110" y2="70"/>
+  </g>
+  
+  <!-- Small dots representing rejected traces -->
+  <g fill="#FFAB00" opacity="0.6">
+    <circle cx="85" cy="35" r="1.5"/>
+    <circle cx="90" cy="40" r="1.5"/>
+    <circle cx="85" cy="85" r="1.5"/>
+    <circle cx="90" cy="80" r="1.5"/>
+  </g>
+</svg>
