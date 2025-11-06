@@ -11,18 +11,12 @@ tests:
 
 telemetry:
   metrics:
-    processor_atlassian_sampling_traces_sampled:
+    processor_atlassian_sampling_cache_reads:
       enabled: true
-      description: Number of traces sampled
-      unit: "{traces}"
+      description: Amount of times a cache was read from
+      unit: "{accesses}"
       sum:
-        value_type: int
-        monotonic: true
-    processor_atlassian_sampling_traces_not_sampled:
-      enabled: true
-      description: Number of traces dropped and not sampled
-      unit: "{traces}"
-      sum:
+        async: true
         value_type: int
         monotonic: true
     processor_atlassian_sampling_chan_blocking_time:
@@ -32,24 +26,17 @@ telemetry:
       histogram:
         value_type: int
         bucket_boundaries: [500000, 1000000, 5000000, 10000000, 50000000, 100000000, 1000000000, 1500000000, 3000000000, 5000000000]
-    processor_atlassian_sampling_trace_eviction_time:
-      enabled: true
-      description: Time that a non-sampled trace was kept in memory from arrival to being evicted
-      unit: s
-      gauge:
-        value_type: double
     processor_atlassian_sampling_decision_eviction_time:
       enabled: true
       description: Time that a trace ID spent in the decision cache before it was evicted
       unit: s
       gauge:
         value_type: double
-    processor_atlassian_sampling_cache_reads:
+    processor_atlassian_sampling_internal_error_dropped_spans:
       enabled: true
-      description: Amount of times a cache was read from
-      unit: "{accesses}"
+      description: Number of spans that have been dropped due to an internal error
+      unit: "{spans}"
       sum:
-        async: true
         value_type: int
         monotonic: true
     processor_atlassian_sampling_policy_decisions:
@@ -65,10 +52,23 @@ telemetry:
       unit: "{traces}"
       gauge:
         value_type: int
-    processor_atlassian_sampling_internal_error_dropped_spans:
+    processor_atlassian_sampling_trace_eviction_time:
       enabled: true
-      description: Number of spans that have been dropped due to an internal error
-      unit: "{spans}"
+      description: Time that a non-sampled trace was kept in memory from arrival to being evicted
+      unit: s
+      gauge:
+        value_type: double
+    processor_atlassian_sampling_traces_not_sampled:
+      enabled: true
+      description: Number of traces dropped and not sampled
+      unit: "{traces}"
+      sum:
+        value_type: int
+        monotonic: true
+    processor_atlassian_sampling_traces_sampled:
+      enabled: true
+      description: Number of traces sampled
+      unit: "{traces}"
       sum:
         value_type: int
         monotonic: true
