@@ -10,70 +10,70 @@ The following telemetry is emitted by this component.
 
 Amount of times a cache was read from
 
-| Unit | Metric Type | Value Type | Monotonic |
-| ---- | ----------- | ---------- | --------- |
-| {accesses} | Sum | Int | true |
+| Unit | Metric Type | Value Type | Monotonic | Stability |
+| ---- | ----------- | ---------- | --------- | --------- |
+| {accesses} | Sum | Int | true | Beta |
 
 ### otelcol_processor_atlassian_sampling_chan_blocking_time
 
 Amount of time spent blocking on the chan send in ConsumeTraces()
 
-| Unit | Metric Type | Value Type |
-| ---- | ----------- | ---------- |
-| ns | Histogram | Int |
+| Unit | Metric Type | Value Type | Stability |
+| ---- | ----------- | ---------- | --------- |
+| ns | Histogram | Int | Beta |
 
 ### otelcol_processor_atlassian_sampling_decision_eviction_time
 
 Time that a trace ID spent in the decision cache before it was evicted
 
-| Unit | Metric Type | Value Type |
-| ---- | ----------- | ---------- |
-| s | Gauge | Double |
+| Unit | Metric Type | Value Type | Stability |
+| ---- | ----------- | ---------- | --------- |
+| s | Gauge | Double | Beta |
 
 ### otelcol_processor_atlassian_sampling_internal_error_dropped_spans
 
 Number of spans that have been dropped due to an internal error
 
-| Unit | Metric Type | Value Type | Monotonic |
-| ---- | ----------- | ---------- | --------- |
-| {spans} | Sum | Int | true |
+| Unit | Metric Type | Value Type | Monotonic | Stability |
+| ---- | ----------- | ---------- | --------- | --------- |
+| {spans} | Sum | Int | true | Beta |
 
 ### otelcol_processor_atlassian_sampling_policy_decisions
 
 Sampling decisions made specifying policy and decision.
 
-| Unit | Metric Type | Value Type | Monotonic |
-| ---- | ----------- | ---------- | --------- |
-| {decisions} | Sum | Int | true |
+| Unit | Metric Type | Value Type | Monotonic | Stability |
+| ---- | ----------- | ---------- | --------- | --------- |
+| {decisions} | Sum | Int | true | Beta |
 
 ### otelcol_processor_atlassian_sampling_primary_cache_size
 
 Size on the primary cache
 
-| Unit | Metric Type | Value Type |
-| ---- | ----------- | ---------- |
-| {traces} | Gauge | Int |
+| Unit | Metric Type | Value Type | Stability |
+| ---- | ----------- | ---------- | --------- |
+| {traces} | Gauge | Int | Beta |
 
 ### otelcol_processor_atlassian_sampling_trace_eviction_time
 
 Time that a non-sampled trace was kept in memory from arrival to being evicted
 
-| Unit | Metric Type | Value Type |
-| ---- | ----------- | ---------- |
-| s | Gauge | Double |
+| Unit | Metric Type | Value Type | Stability |
+| ---- | ----------- | ---------- | --------- |
+| s | Gauge | Double | Beta |
 
 ### otelcol_processor_atlassian_sampling_traces_not_sampled
 
 Number of traces dropped and not sampled
 
-| Unit | Metric Type | Value Type | Monotonic |
-| ---- | ----------- | ---------- | --------- |
-| {traces} | Sum | Int | true |
+| Unit | Metric Type | Value Type | Monotonic | Stability |
+| ---- | ----------- | ---------- | --------- | --------- |
+| {traces} | Sum | Int | true | Beta |
 
 ### otelcol_processor_atlassian_sampling_traces_sampled
 
 Number of traces sampled
 
-| Unit | Metric Type | Value Type | Monotonic |
-| ---- | ----------- | ---------- | --------- |
-| {traces} | Sum | Int | true |
+| Unit | Metric Type | Value Type | Monotonic | Stability |
+| ---- | ----------- | ---------- | --------- | --------- |
+| {traces} | Sum | Int | true | Beta |

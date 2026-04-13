@@ -94,56 +94,56 @@ func NewTelemetryBuilder(settings component.TelemetrySettings, options ...Teleme
 	var err, errs error
 	builder.ProcessorAtlassianSamplingCacheReads, err = builder.meter.Int64ObservableCounter(
 		"otelcol_processor_atlassian_sampling_cache_reads",
-		metric.WithDescription("Amount of times a cache was read from"),
+		metric.WithDescription("Amount of times a cache was read from [Beta]"),
 		metric.WithUnit("{accesses}"),
 	)
 	errs = errors.Join(errs, err)
 	builder.ProcessorAtlassianSamplingChanBlockingTime, err = builder.meter.Int64Histogram(
 		"otelcol_processor_atlassian_sampling_chan_blocking_time",
-		metric.WithDescription("Amount of time spent blocking on the chan send in ConsumeTraces()"),
+		metric.WithDescription("Amount of time spent blocking on the chan send in ConsumeTraces() [Beta]"),
 		metric.WithUnit("ns"),
 		metric.WithExplicitBucketBoundaries([]float64{500000, 1e+06, 5e+06, 1e+07, 5e+07, 1e+08, 1e+09, 1.5e+09, 3e+09, 5e+09}...),
 	)
 	errs = errors.Join(errs, err)
 	builder.ProcessorAtlassianSamplingDecisionEvictionTime, err = builder.meter.Float64Gauge(
 		"otelcol_processor_atlassian_sampling_decision_eviction_time",
-		metric.WithDescription("Time that a trace ID spent in the decision cache before it was evicted"),
+		metric.WithDescription("Time that a trace ID spent in the decision cache before it was evicted [Beta]"),
 		metric.WithUnit("s"),
 	)
 	errs = errors.Join(errs, err)
 	builder.ProcessorAtlassianSamplingInternalErrorDroppedSpans, err = builder.meter.Int64Counter(
 		"otelcol_processor_atlassian_sampling_internal_error_dropped_spans",
-		metric.WithDescription("Number of spans that have been dropped due to an internal error"),
+		metric.WithDescription("Number of spans that have been dropped due to an internal error [Beta]"),
 		metric.WithUnit("{spans}"),
 	)
 	errs = errors.Join(errs, err)
 	builder.ProcessorAtlassianSamplingPolicyDecisions, err = builder.meter.Int64Counter(
 		"otelcol_processor_atlassian_sampling_policy_decisions",
-		metric.WithDescription("Sampling decisions made specifying policy and decision."),
+		metric.WithDescription("Sampling decisions made specifying policy and decision. [Beta]"),
 		metric.WithUnit("{decisions}"),
 	)
 	errs = errors.Join(errs, err)
 	builder.ProcessorAtlassianSamplingPrimaryCacheSize, err = builder.meter.Int64Gauge(
 		"otelcol_processor_atlassian_sampling_primary_cache_size",
-		metric.WithDescription("Size on the primary cache"),
+		metric.WithDescription("Size on the primary cache [Beta]"),
 		metric.WithUnit("{traces}"),
 	)
 	errs = errors.Join(errs, err)
 	builder.ProcessorAtlassianSamplingTraceEvictionTime, err = builder.meter.Float64Gauge(
 		"otelcol_processor_atlassian_sampling_trace_eviction_time",
-		metric.WithDescription("Time that a non-sampled trace was kept in memory from arrival to being evicted"),
+		metric.WithDescription("Time that a non-sampled trace was kept in memory from arrival to being evicted [Beta]"),
 		metric.WithUnit("s"),
 	)
 	errs = errors.Join(errs, err)
 	builder.ProcessorAtlassianSamplingTracesNotSampled, err = builder.meter.Int64Counter(
 		"otelcol_processor_atlassian_sampling_traces_not_sampled",
-		metric.WithDescription("Number of traces dropped and not sampled"),
+		metric.WithDescription("Number of traces dropped and not sampled [Beta]"),
 		metric.WithUnit("{traces}"),
 	)
 	errs = errors.Join(errs, err)
 	builder.ProcessorAtlassianSamplingTracesSampled, err = builder.meter.Int64Counter(
 		"otelcol_processor_atlassian_sampling_traces_sampled",
-		metric.WithDescription("Number of traces sampled"),
+		metric.WithDescription("Number of traces sampled [Beta]"),
 		metric.WithUnit("{traces}"),
 	)
 	errs = errors.Join(errs, err)

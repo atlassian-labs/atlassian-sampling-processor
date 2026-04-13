@@ -19,6 +19,7 @@ telemetry:
         async: true
         value_type: int
         monotonic: true
+      stability: beta
     processor_atlassian_sampling_chan_blocking_time:
       enabled: true
       description: Amount of time spent blocking on the chan send in ConsumeTraces()
@@ -26,12 +27,14 @@ telemetry:
       histogram:
         value_type: int
         bucket_boundaries: [500000, 1000000, 5000000, 10000000, 50000000, 100000000, 1000000000, 1500000000, 3000000000, 5000000000]
+      stability: beta
     processor_atlassian_sampling_decision_eviction_time:
       enabled: true
       description: Time that a trace ID spent in the decision cache before it was evicted
       unit: s
       gauge:
         value_type: double
+      stability: beta
     processor_atlassian_sampling_internal_error_dropped_spans:
       enabled: true
       description: Number of spans that have been dropped due to an internal error
@@ -39,6 +42,7 @@ telemetry:
       sum:
         value_type: int
         monotonic: true
+      stability: beta
     processor_atlassian_sampling_policy_decisions:
       enabled: true
       description: Sampling decisions made specifying policy and decision.
@@ -46,18 +50,21 @@ telemetry:
       sum:
         value_type: int
         monotonic: true
+      stability: beta
     processor_atlassian_sampling_primary_cache_size:
       enabled: true
       description: Size on the primary cache
       unit: "{traces}"
       gauge:
         value_type: int
+      stability: beta
     processor_atlassian_sampling_trace_eviction_time:
       enabled: true
       description: Time that a non-sampled trace was kept in memory from arrival to being evicted
       unit: s
       gauge:
         value_type: double
+      stability: beta
     processor_atlassian_sampling_traces_not_sampled:
       enabled: true
       description: Number of traces dropped and not sampled
@@ -65,6 +72,7 @@ telemetry:
       sum:
         value_type: int
         monotonic: true
+      stability: beta
     processor_atlassian_sampling_traces_sampled:
       enabled: true
       description: Number of traces sampled
@@ -72,3 +80,4 @@ telemetry:
       sum:
         value_type: int
         monotonic: true
+      stability: beta

@@ -26,8 +26,8 @@ import (
 
 type ottlConditionEvaluator struct {
 	StartFunc
-	sampleSpanExpr      BoolExpr[ottlspan.TransformContext]
-	sampleSpanEventExpr BoolExpr[ottlspanevent.TransformContext]
+	sampleSpanExpr      BoolExpr[*ottlspan.TransformContext]
+	sampleSpanEventExpr BoolExpr[*ottlspanevent.TransformContext]
 	errorMode           ottl.ErrorMode
 }
 
@@ -92,7 +92,7 @@ func (oce *ottlConditionEvaluator) Evaluate(ctx context.Context, _ pcommon.Trace
 
 		// Span evaluation
 		if oce.sampleSpanExpr != nil {
-			ok, err = oce.sampleSpanExpr.Eval(ctx, ottlspan.NewTransformContext(span, ss.Scope(), rs.Resource(), ss, rs))
+			ok, err = oce.sampleSpanExpr.Eval(ctx, ottlspan.NewTransformContextPtr(rs, ss, span))
 			if err != nil {
 				return Pending, err
 			}
@@ -105,7 +105,7 @@ func (oce *ottlConditionEvaluator) Evaluate(ctx context.Context, _ pcommon.Trace
 		if oce.sampleSpanEventExpr != nil {
 			spanEvents := span.Events()
 			for l := 0; l < spanEvents.Len(); l++ {
-				ok, err = oce.sampleSpanEventExpr.Eval(ctx, ottlspanevent.NewTransformContext(spanEvents.At(l), span, ss.Scope(), rs.Resource(), ss, rs))
+				ok, err = oce.sampleSpanEventExpr.Eval(ctx, ottlspanevent.NewTransformContextPtr(rs, ss, span, spanEvents.At(l)))
 				if err != nil {
 					return Pending, err
 				}
@@ -122,7 +122,7 @@ func (oce *ottlConditionEvaluator) Evaluate(ctx context.Context, _ pcommon.Trace
 // newBoolExprForSpan creates a BoolExpr[ottlspan.TransformContext] that will return true if any of the given OTTL conditions evaluate to true.
 // The passed in functions should use the ottlspan.TransformContext.
 // If a function named `match` is not present in the function map it will be added automatically so that parsing works as expected
-func newBoolExprForSpan(conditions []string, functions map[string]ottl.Factory[ottlspan.TransformContext], errorMode ottl.ErrorMode, set component.TelemetrySettings) (BoolExpr[ottlspan.TransformContext], error) {
+func newBoolExprForSpan(conditions []string, functions map[string]ottl.Factory[*ottlspan.TransformContext], errorMode ottl.ErrorMode, set component.TelemetrySettings) (BoolExpr[*ottlspan.TransformContext], error) {
 	parser, err := ottlspan.NewParser(functions, set)
 	if err != nil {
 		return nil, err
@@ -138,7 +138,7 @@ func newBoolExprForSpan(conditions []string, functions map[string]ottl.Factory[o
 // newBoolExprForSpanEvent creates a BoolExpr[ottlspanevent.TransformContext] that will return true if any of the given OTTL conditions evaluate to true.
 // The passed in functions should use the ottlspanevent.TransformContext.
 // If a function named `match` is not present in the function map it will be added automatically so that parsing works as expected
-func newBoolExprForSpanEvent(conditions []string, functions map[string]ottl.Factory[ottlspanevent.TransformContext], errorMode ottl.ErrorMode, set component.TelemetrySettings) (BoolExpr[ottlspanevent.TransformContext], error) {
+func newBoolExprForSpanEvent(conditions []string, functions map[string]ottl.Factory[*ottlspanevent.TransformContext], errorMode ottl.ErrorMode, set component.TelemetrySettings) (BoolExpr[*ottlspanevent.TransformContext], error) {
 	parser, err := ottlspanevent.NewParser(functions, set)
 	if err != nil {
 		return nil, err
@@ -151,13 +151,13 @@ func newBoolExprForSpanEvent(conditions []string, functions map[string]ottl.Fact
 	return &c, nil
 }
 
-func standardSpanFuncs() map[string]ottl.Factory[ottlspan.TransformContext] {
-	m := ottlfuncs.StandardConverters[ottlspan.TransformContext]()
-	isRootSpanFactory := ottlfuncs.NewIsRootSpanFactory()
+func standardSpanFuncs() map[string]ottl.Factory[*ottlspan.TransformContext] {
+	m := ottlfuncs.StandardConverters[*ottlspan.TransformContext]()
+	isRootSpanFactory := ottlfuncs.NewIsRootSpanFactoryNew()
 	m[isRootSpanFactory.Name()] = isRootSpanFactory
 	return m
 }
 
-func standardSpanEventFuncs() map[string]ottl.Factory[ottlspanevent.TransformContext] {
-	return ottlfuncs.StandardConverters[ottlspanevent.TransformContext]()
+func standardSpanEventFuncs() map[string]ottl.Factory[*ottlspanevent.TransformContext] {
+	return ottlfuncs.StandardConverters[*ottlspanevent.TransformContext]()
 }
