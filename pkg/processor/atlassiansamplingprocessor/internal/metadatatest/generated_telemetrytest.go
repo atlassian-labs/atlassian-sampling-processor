@@ -24,7 +24,7 @@ func NewSettings(tt *componenttest.Telemetry) processor.Settings {
 func AssertEqualProcessorAtlassianSamplingCacheReads(t *testing.T, tt *componenttest.Telemetry, dps []metricdata.DataPoint[int64], opts ...metricdatatest.Option) {
 	want := metricdata.Metrics{
 		Name:        "otelcol_processor_atlassian_sampling_cache_reads",
-		Description: "Amount of times a cache was read from",
+		Description: "Amount of times a cache was read from [Beta]",
 		Unit:        "{accesses}",
 		Data: metricdata.Sum[int64]{
 			Temporality: metricdata.CumulativeTemporality,
@@ -40,7 +40,7 @@ func AssertEqualProcessorAtlassianSamplingCacheReads(t *testing.T, tt *component
 func AssertEqualProcessorAtlassianSamplingChanBlockingTime(t *testing.T, tt *componenttest.Telemetry, dps []metricdata.HistogramDataPoint[int64], opts ...metricdatatest.Option) {
 	want := metricdata.Metrics{
 		Name:        "otelcol_processor_atlassian_sampling_chan_blocking_time",
-		Description: "Amount of time spent blocking on the chan send in ConsumeTraces()",
+		Description: "Amount of time spent blocking on the chan send in ConsumeTraces() [Beta]",
 		Unit:        "ns",
 		Data: metricdata.Histogram[int64]{
 			Temporality: metricdata.CumulativeTemporality,
@@ -55,7 +55,7 @@ func AssertEqualProcessorAtlassianSamplingChanBlockingTime(t *testing.T, tt *com
 func AssertEqualProcessorAtlassianSamplingDecisionEvictionTime(t *testing.T, tt *componenttest.Telemetry, dps []metricdata.DataPoint[float64], opts ...metricdatatest.Option) {
 	want := metricdata.Metrics{
 		Name:        "otelcol_processor_atlassian_sampling_decision_eviction_time",
-		Description: "Time that a trace ID spent in the decision cache before it was evicted",
+		Description: "Time that a trace ID spent in the decision cache before it was evicted [Beta]",
 		Unit:        "s",
 		Data: metricdata.Gauge[float64]{
 			DataPoints: dps,
@@ -69,7 +69,7 @@ func AssertEqualProcessorAtlassianSamplingDecisionEvictionTime(t *testing.T, tt 
 func AssertEqualProcessorAtlassianSamplingInternalErrorDroppedSpans(t *testing.T, tt *componenttest.Telemetry, dps []metricdata.DataPoint[int64], opts ...metricdatatest.Option) {
 	want := metricdata.Metrics{
 		Name:        "otelcol_processor_atlassian_sampling_internal_error_dropped_spans",
-		Description: "Number of spans that have been dropped due to an internal error",
+		Description: "Number of spans that have been dropped due to an internal error [Beta]",
 		Unit:        "{spans}",
 		Data: metricdata.Sum[int64]{
 			Temporality: metricdata.CumulativeTemporality,
@@ -85,7 +85,7 @@ func AssertEqualProcessorAtlassianSamplingInternalErrorDroppedSpans(t *testing.T
 func AssertEqualProcessorAtlassianSamplingPolicyDecisions(t *testing.T, tt *componenttest.Telemetry, dps []metricdata.DataPoint[int64], opts ...metricdatatest.Option) {
 	want := metricdata.Metrics{
 		Name:        "otelcol_processor_atlassian_sampling_policy_decisions",
-		Description: "Sampling decisions made specifying policy and decision.",
+		Description: "Sampling decisions made specifying policy and decision. [Beta]",
 		Unit:        "{decisions}",
 		Data: metricdata.Sum[int64]{
 			Temporality: metricdata.CumulativeTemporality,
@@ -101,7 +101,7 @@ func AssertEqualProcessorAtlassianSamplingPolicyDecisions(t *testing.T, tt *comp
 func AssertEqualProcessorAtlassianSamplingPrimaryCacheSize(t *testing.T, tt *componenttest.Telemetry, dps []metricdata.DataPoint[int64], opts ...metricdatatest.Option) {
 	want := metricdata.Metrics{
 		Name:        "otelcol_processor_atlassian_sampling_primary_cache_size",
-		Description: "Size on the primary cache",
+		Description: "Size on the primary cache [Beta]",
 		Unit:        "{traces}",
 		Data: metricdata.Gauge[int64]{
 			DataPoints: dps,
@@ -115,7 +115,7 @@ func AssertEqualProcessorAtlassianSamplingPrimaryCacheSize(t *testing.T, tt *com
 func AssertEqualProcessorAtlassianSamplingTraceEvictionTime(t *testing.T, tt *componenttest.Telemetry, dps []metricdata.DataPoint[float64], opts ...metricdatatest.Option) {
 	want := metricdata.Metrics{
 		Name:        "otelcol_processor_atlassian_sampling_trace_eviction_time",
-		Description: "Time that a non-sampled trace was kept in memory from arrival to being evicted",
+		Description: "Time that a non-sampled trace was kept in memory from arrival to being evicted [Beta]",
 		Unit:        "s",
 		Data: metricdata.Gauge[float64]{
 			DataPoints: dps,
@@ -129,7 +129,7 @@ func AssertEqualProcessorAtlassianSamplingTraceEvictionTime(t *testing.T, tt *co
 func AssertEqualProcessorAtlassianSamplingTracesNotSampled(t *testing.T, tt *componenttest.Telemetry, dps []metricdata.DataPoint[int64], opts ...metricdatatest.Option) {
 	want := metricdata.Metrics{
 		Name:        "otelcol_processor_atlassian_sampling_traces_not_sampled",
-		Description: "Number of traces dropped and not sampled",
+		Description: "Number of traces dropped and not sampled [Beta]",
 		Unit:        "{traces}",
 		Data: metricdata.Sum[int64]{
 			Temporality: metricdata.CumulativeTemporality,
@@ -145,7 +145,7 @@ func AssertEqualProcessorAtlassianSamplingTracesNotSampled(t *testing.T, tt *com
 func AssertEqualProcessorAtlassianSamplingTracesSampled(t *testing.T, tt *componenttest.Telemetry, dps []metricdata.DataPoint[int64], opts ...metricdatatest.Option) {
 	want := metricdata.Metrics{
 		Name:        "otelcol_processor_atlassian_sampling_traces_sampled",
-		Description: "Number of traces sampled",
+		Description: "Number of traces sampled [Beta]",
 		Unit:        "{traces}",
 		Data: metricdata.Sum[int64]{
 			Temporality: metricdata.CumulativeTemporality,
