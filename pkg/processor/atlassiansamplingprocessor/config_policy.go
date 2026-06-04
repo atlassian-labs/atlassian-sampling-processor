@@ -22,6 +22,12 @@ type PolicyConfig struct {
 	RootSpansConfig RootSpansConfig `mapstructure:"root_spans"`
 
 	DowngraderConfig DowngraderConfig `mapstructure:"downgrader"`
+
+	// RecordDecisionFrom is an optional resource attribute key to be used
+	// for tracking which resources are causing Sampled/NotSampled decisions.
+	// For example, you may have a policy that matches from many services,
+	// setting RecordDecisionFrom to 'service.name' will enrich the telemetry with that info.
+	RecordDecisionFrom string `mapstructure:"record_decision_from"`
 }
 
 // SharedPolicyConfig holds the common configuration to all policies that are used in derivative policy configurations

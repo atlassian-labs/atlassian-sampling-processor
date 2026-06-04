@@ -11,6 +11,7 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
 
+	"github.com/atlassian-labs/atlassian-sampling-processor/internal/ptraceutil"
 	"github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/evaluators"
 	"github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/metadata"
 	"github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/tracedata"
@@ -45,9 +46,6 @@ func (d *decider) MakeDecision(ctx context.Context, id pcommon.TraceID, currentT
 		if err != nil {
 			d.log.Warn("policy evaluation errored", zap.Error(err), zap.String("policy.name", p.name))
 		}
-		d.telemetry.ProcessorAtlassianSamplingPolicyDecisions.Add(ctx, 1, metric.WithAttributeSet(attribute.NewSet(
-			attribute.String("policy", p.name),
-			attribute.String("decision", decision.String()))))
 
 		// Assume we have policy list [X, Y, Z],
 		// 1. Trace A/Span A is marked as low priority by a policy Z, we will set LastLowPriorityDecisionName to Z.
@@ -57,6 +55,19 @@ func (d *decider) MakeDecision(ctx context.Context, id pcommon.TraceID, currentT
 			*mergedMetadata.LastLowPriorityDecisionName != p.name &&
 			decision == evaluators.LowPriority {
 			decision = evaluators.Pending
+		}
+
+		// record metrics
+		if decision != evaluators.Pending {
+			attrs := []attribute.KeyValue{
+				attribute.String("policy", p.name),
+				attribute.String("decision", decision.String()),
+			}
+			if decision == evaluators.Sampled || decision == evaluators.NotSampled {
+				decisionFrom := extractResourceAttribute(currentTrace, p.recordDecisionFrom)
+				attrs = append(attrs, attribute.String("decision_from", decisionFrom))
+			}
+			d.telemetry.ProcessorAtlassianSamplingPolicyDecisions.Add(ctx, 1, metric.WithAttributeSet(attribute.NewSet(attrs...)))
 		}
 
 		if decision == evaluators.Sampled || decision == evaluators.NotSampled || decision == evaluators.LowPriority {
@@ -156,4 +167,19 @@ func getNewDowngraderPolicy(cfg *DowngraderConfig, set component.TelemetrySettin
 		return nil, err
 	}
 	return evaluators.NewDowngrader(downgradeTo, subPolicy)
+}
+
+// extractResourceAttribute extracts the first occurrence of the given resource attribute key.
+// Note this is only valid because we are guaranteed that only one resource is on this trace,
+// because the construction earlier in the processor guarantees it.
+func extractResourceAttribute(traces ptrace.Traces, key string) string {
+	if key == "" {
+		return ""
+	}
+	for item := range ptraceutil.TraceIterator(traces) {
+		if val, ok := item.ResourceSpans.Resource().Attributes().Get(key); ok {
+			return val.AsString()
+		}
+	}
+	return ""
 }

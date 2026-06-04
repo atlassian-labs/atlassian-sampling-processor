@@ -64,6 +64,7 @@ func TestLoadConfig(t *testing.T) {
 						Name: "test-policy-2",
 						Type: "and",
 					},
+					RecordDecisionFrom: "service.name",
 					AndConfig: AndConfig{
 						SubPolicyCfg: []AndSubPolicyConfig{
 							{

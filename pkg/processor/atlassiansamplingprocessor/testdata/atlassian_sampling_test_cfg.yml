@@ -19,6 +19,7 @@ atlassian_sampling:
       {
         name: test-policy-2,
         type: and,
+        record_decision_from: service.name,
         and: {
           and_sub_policy:
             [

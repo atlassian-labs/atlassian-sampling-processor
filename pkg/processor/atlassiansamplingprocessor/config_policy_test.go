@@ -31,6 +31,7 @@ func TestPolicyCreationFromConfig(t *testing.T) {
 	assert.Equal(t, Probabilistic, policies[0].policyType)
 	assert.Equal(t, "test-policy-2", policies[1].name)
 	assert.Equal(t, And, policies[1].policyType)
+	assert.Equal(t, "service.name", policies[1].recordDecisionFrom)
 	assert.Equal(t, "test-policy-3", policies[2].name)
 	assert.Equal(t, SpanCount, policies[2].policyType)
 	assert.Equal(t, "test-policy-4", policies[3].name)

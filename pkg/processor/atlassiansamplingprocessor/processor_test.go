@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/processor/processortest"
 
+	"github.com/atlassian-labs/atlassian-sampling-processor/internal/ptraceutil"
 	"github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/evaluators"
 	"github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/memory"
 	"github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/metadata"
@@ -169,7 +170,7 @@ func TestConsumeTraces_DecisionCachesAreRespected(t *testing.T) {
 
 		require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
 		// should be sampled by policy
-		require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+		require.NoError(t, asp.ConsumeTraces(ctx, cloneTracesForTest(trace1)))
 		flushInFlight(asp)
 		waitUntil(t, func() bool {
 			return sink.SpanCount() > 0
@@ -179,7 +180,7 @@ func TestConsumeTraces_DecisionCachesAreRespected(t *testing.T) {
 
 		decider.NextDecision = evaluators.Pending
 		// send again, this should also be let through
-		require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+		require.NoError(t, asp.ConsumeTraces(ctx, cloneTracesForTest(trace1)))
 		flushInFlight(asp)
 		waitUntil(t, func() bool {
 			return sink.SpanCount() > 0
@@ -193,7 +194,7 @@ func TestConsumeTraces_DecisionCachesAreRespected(t *testing.T) {
 		asp.sampledDecisionCache.Clear()
 		// cause a NotSampled decision, populating nonSampledDecision cache
 		decider.NextDecision = evaluators.NotSampled
-		require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+		require.NoError(t, asp.ConsumeTraces(ctx, cloneTracesForTest(trace1)))
 		flushInFlight(asp)
 		assert.Equal(t, 0, sink.SpanCount())
 		_, ok = asp.nonSampledDecisionCache.Get(testTraceID)
@@ -201,7 +202,7 @@ func TestConsumeTraces_DecisionCachesAreRespected(t *testing.T) {
 
 		// Should be dropped because cached NotSampled decision
 		decider.NextDecision = evaluators.Sampled
-		require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+		require.NoError(t, asp.ConsumeTraces(ctx, cloneTracesForTest(trace1)))
 		flushInFlight(asp)
 		assert.Equal(t, 0, sink.SpanCount())
 		_, ok = asp.traceData.Get(testTraceID)
@@ -255,6 +256,84 @@ func TestConsumeTraces_MultipleTracesInOneResourceSpan(t *testing.T) {
 		assert.Equal(t, 2, sink.SpanCount())
 		require.Equal(t, 2, len(sink.AllTraces())) // initial trace is split into 2
 	})
+}
+
+// TestConsumeTraces_TwoTracesSharingScope_BothPending puts two different
+// trace IDs into a single ScopeSpans (so they share an instrumentation scope
+// pointer in the processor's internal grouping), runs the processor on a
+// single shard, and forces both trace IDs into a Pending decision. The
+// instrumentation scope pointer is reused across trace IDs in this layout.
+//
+// This is a defensive test designed to prevent any bad accesses of spans after they've been moved.
+func TestConsumeTraces_TwoTracesSharingScope_BothPending(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := NewFactory()
+	cfg := (f.CreateDefaultConfig()).(*Config)
+	cfg.Shards = 1
+	cfg.PrimaryCacheSize = 100
+	cfg.DecisionCacheCfg.SampledCacheSize = 100
+	cfg.DecisionCacheCfg.NonSampledCacheSize = 100
+
+	sink := &consumertest.TracesSink{}
+
+	asp, err := newAtlassianSamplingProcessor(cfg, componenttest.NewNopTelemetrySettings(), sink)
+	require.NoError(t, err)
+	require.NotNil(t, asp)
+
+	decider := &mockDecider{}
+	asp.decider = decider
+
+	require.NoError(t, asp.Start(ctx, componenttest.NewNopHost()))
+
+	// One ResourceSpans, one ScopeSpans, two trace IDs (1 span each).
+	trace := ptrace.NewTraces()
+	spans := trace.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans()
+	span1 := spans.AppendEmpty()
+	span1.SetTraceID(testTraceID)
+	span1.SetStartTimestamp(2)
+	span1.SetEndTimestamp(5)
+	span2 := spans.AppendEmpty()
+	span2.SetTraceID(testTraceID2)
+	span2.SetStartTimestamp(1)
+	span2.SetEndTimestamp(3)
+
+	// Force both trace IDs into Pending — they get cached, not emitted.
+	decider.NextDecision = evaluators.Pending
+	decider.NextDecisionPolicy = &policy{name: "test-policy", policyType: RootSpans}
+	require.NoError(t, asp.ConsumeTraces(ctx, trace))
+	flushInFlight(asp)
+
+	assert.Equal(t, 0, sink.SpanCount(), "both pending traces should be cached, not emitted")
+
+	trace2 := ptrace.NewTraces()
+	spans2 := trace2.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans()
+	follow1 := spans2.AppendEmpty()
+	follow1.SetTraceID(testTraceID)
+	follow1.SetStartTimestamp(6)
+	follow1.SetEndTimestamp(9)
+	follow2 := spans2.AppendEmpty()
+	follow2.SetTraceID(testTraceID2)
+	follow2.SetStartTimestamp(4)
+	follow2.SetEndTimestamp(7)
+
+	// Now sample so everything gets exported
+	decider.NextDecision = evaluators.Sampled
+	require.NoError(t, asp.ConsumeTraces(ctx, trace2))
+	require.NoError(t, asp.Shutdown(ctx))
+
+	assert.Equal(t, 4, sink.SpanCount(), "expected cached + new spans for both trace IDs")
+
+	// Verify the emitted spans actually carry the right trace IDs.
+	counts := map[pcommon.TraceID]int{}
+	for _, out := range sink.AllTraces() {
+		for tr := range ptraceutil.TraceIterator(out) {
+			counts[tr.Span.TraceID()]++
+		}
+	}
+	assert.Equal(t, 2, counts[testTraceID], "trace 1 should appear twice (cached + new)")
+	assert.Equal(t, 2, counts[testTraceID2], "trace 2 should appear twice (cached + new)")
+	assert.NotContains(t, counts, pcommon.TraceID{}, "should not see any hollow (zero-trace-ID) spans")
 }
 
 func TestConsumeTraces_CacheMetadata(t *testing.T) {
@@ -370,7 +449,7 @@ func TestConsumeTraces_TraceDataPrioritised(t *testing.T) {
 		span3.SetTraceID(testTraceID2)
 		span3.SetStartTimestamp(1)
 		span3.SetEndTimestamp(3)
-		require.NoError(t, asp.ConsumeTraces(ctx, trace3))
+		require.NoError(t, asp.ConsumeTraces(ctx, cloneTracesForTest(trace3)))
 		flushInFlight(asp)
 
 		assert.Equal(t, 0, sink.SpanCount())
@@ -387,7 +466,7 @@ func TestConsumeTraces_TraceDataPrioritised(t *testing.T) {
 		// promote testTraceID2 into regular priority
 		decider.NextDecision = evaluators.Pending
 		decider.NextDecisionPolicy = &policy{name: "test-policy2", policyType: Probabilistic}
-		require.NoError(t, asp.ConsumeTraces(ctx, trace3))
+		require.NoError(t, asp.ConsumeTraces(ctx, cloneTracesForTest(trace3)))
 		flushInFlight(asp)
 		td, ok = asp.traceData.Get(testTraceID2)
 		require.True(t, ok)
@@ -421,7 +500,7 @@ func TestConsumeTraces_TraceDataPrioritised(t *testing.T) {
 		// now cause testTraceID2 to be sampled
 		assert.Equal(t, 0, sink.SpanCount())
 		decider.NextDecision = evaluators.Sampled
-		require.NoError(t, asp.ConsumeTraces(ctx, trace3))
+		require.NoError(t, asp.ConsumeTraces(ctx, cloneTracesForTest(trace3)))
 		flushInFlight(asp)
 		assert.Equal(t, 3, sink.SpanCount())
 
@@ -454,7 +533,7 @@ func TestConsumeTraces_PriorityNotDemoted(t *testing.T) {
 		span1.SetTraceID(testTraceID)
 		span1.SetStartTimestamp(2)
 		span1.SetEndTimestamp(5)
-		require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+		require.NoError(t, asp.ConsumeTraces(ctx, cloneTracesForTest(trace1)))
 		flushInFlight(asp)
 
 		td, ok := asp.traceData.Get(testTraceID)
@@ -464,7 +543,7 @@ func TestConsumeTraces_PriorityNotDemoted(t *testing.T) {
 
 		// Consume again, should remain unspecified priority
 		decider.NextDecision = evaluators.LowPriority
-		require.NoError(t, asp.ConsumeTraces(ctx, trace1))
+		require.NoError(t, asp.ConsumeTraces(ctx, cloneTracesForTest(trace1)))
 		flushInFlight(asp)
 
 		td, ok = asp.traceData.Get(testTraceID)
@@ -1108,6 +1187,14 @@ func flushInFlight(asp *atlassianSamplingProcessor) {
 	for _, shard := range asp.shards {
 		shard <- []*groupedTraceData{}
 	}
+}
+
+// cloneTracesForTest returns a deep copy of src.
+// ConsumeTraces calls — use this helper to produce a fresh copy per call.
+func cloneTracesForTest(src ptrace.Traces) ptrace.Traces {
+	dst := ptrace.NewTraces()
+	src.CopyTo(dst)
+	return dst
 }
 
 func testSingleAndMultiSharded(t *testing.T, cfgCp Config, f func(cfg *Config)) {
