@@ -4,12 +4,25 @@ import (
 	"fmt"
 	"runtime"
 
+	"go.uber.org/zap"
+
 	"github.com/atlassian-labs/atlassian-sampling-processor/pkg/processor/atlassiansamplingprocessor/internal/cache"
 )
 
-const increaseMultiplier float64 = 1.02
-const decreaseMultiplier float64 = 0.98
-const lowerThreshold float64 = 0.9
+// Pressure mode thresholds as ratios of heap usage to target heap.
+const (
+	// growThreshold: below this ratio, the cache is allowed to grow gently.
+	growThreshold float64 = 0.85
+	// moderatePressureThreshold: above this ratio, shrink proportionally.
+	moderatePressureThreshold float64 = 1.0
+	// highPressureThreshold: above this ratio, shrink aggressively with a direct estimate.
+	highPressureThreshold float64 = 1.15
+	// emergencyThreshold: above this ratio, drop to minSize immediately.
+	emergencyThreshold float64 = 1.3
+
+	// growMultiplier is the gentle growth rate applied when heap is well below target.
+	growMultiplier float64 = 1.02
+)
 
 type HeapGetter func() uint64
 
@@ -23,9 +36,10 @@ type Regulator struct {
 	targetHeap   uint64
 	getHeapUsage HeapGetter
 	cache        cache.Sizer
+	log          *zap.Logger
 }
 
-func NewRegulator(minSize int, maxSize int, targetHeap uint64, hg HeapGetter, c cache.Sizer) (*Regulator, error) {
+func NewRegulator(minSize int, maxSize int, targetHeap uint64, hg HeapGetter, c cache.Sizer, log *zap.Logger) (*Regulator, error) {
 	if minSize < 0 || maxSize <= 0 || targetHeap <= 0 {
 		return nil, fmt.Errorf("invalid input values")
 	}
@@ -41,27 +55,39 @@ func NewRegulator(minSize int, maxSize int, targetHeap uint64, hg HeapGetter, c 
 		targetHeap:   targetHeap,
 		getHeapUsage: hg,
 		cache:        c,
+		log:          log,
 	}, nil
 }
 
-// RegulateCacheSize decreases the cache size by 2% if the current heap size is above the target heap size.
-// It increases the cache size by 2% if the current heap size is less than 90% of the target heap size.
+// RegulateCacheSize uses a modal proportional controller to adjust cache size based on heap pressure.
+// The controller operates in distinct modes based on the ratio of current heap usage to the target:
 func (r *Regulator) RegulateCacheSize() int {
 	currSize := r.cache.Size()
-	newSize := currSize
 	heap := r.getHeapUsage()
 
-	if heap < uint64(lowerThreshold*float64(r.targetHeap)) {
-		// increase cache by 2%
-		newSize = int(float64(currSize) * (increaseMultiplier))
-	} else if heap > r.targetHeap {
-		// reduce cache by 2%
-		newSize = int(float64(currSize) * (decreaseMultiplier))
+	ratio := float64(heap) / float64(r.targetHeap)
+
+	var newSize int
+	switch {
+	case ratio > emergencyThreshold:
+		// Emergency: drop to minimum immediately
+		newSize = r.minSize
+	case ratio > highPressureThreshold:
+		scale := (float64(r.targetHeap) / float64(heap))
+		newSize = int(float64(currSize) * scale * scale)
+	case ratio > moderatePressureThreshold:
+		newSize = int(float64(currSize) * float64(r.targetHeap) / float64(heap))
+	case ratio < growThreshold:
+		newSize = int(float64(currSize) * growMultiplier)
+	default:
+		newSize = currSize
 	}
 
 	newSize = r.clamp(newSize)
 	if newSize != currSize {
 		r.cache.Resize(newSize)
+		r.log.Info("memory regulator: cache size updated",
+			zap.Int("old_size", currSize), zap.Int("new_size", newSize))
 	}
 	return newSize
 }

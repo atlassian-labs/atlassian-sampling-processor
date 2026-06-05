@@ -155,7 +155,8 @@ func newAtlassianSamplingProcessor(cCfg component.Config, set component.Telemetr
 			cfg.PrimaryCacheSize,
 			cfg.TargetHeapBytes,
 			memory.GetHeapUsage,
-			primaryCache)
+			primaryCache,
+			set.Logger)
 		if rErr != nil {
 			return nil, rErr
 		}
@@ -280,7 +281,9 @@ func (asp *atlassianSamplingProcessor) ConsumeTraces(ctx context.Context, td ptr
 			case asp.shards[i] <- shardedResourceSpans[i]:
 				return nil
 			case <-ctx.Done():
-				return fmt.Errorf("context cancelled while waiting for shards[%d] to receive: %w", i, ctx.Err())
+				err := fmt.Errorf("context cancelled while waiting for shards[%d] to receive: %w", i, ctx.Err())
+				asp.log.Error("Failed to send traces to shard", zap.Int(shardIDKey, i), zap.Error(err))
+				return err
 			}
 		})
 	}
@@ -331,13 +334,13 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, gtdArr
 	for _, gtd := range gtdArr {
 		id := gtd.id
 		resource := gtd.resource
-		spans := gtd.spans
-		if asp.cachedDecision(ctx, id, resource, spans) {
+		if asp.cachedDecision(ctx, id, resource, gtd.spans) {
 			continue
 		}
 
 		currentTrace := ptrace.NewTraces()
-		appendToTraces(currentTrace, resource, spans)
+		appendAndMoveToTraces(currentTrace, resource, gtd.spans)
+		gtd.spans = nil // make sure you don't reference this again
 
 		td, err := tracedata.NewTraceData(time.Now(), currentTrace, priority.Unspecified, asp.compress)
 		if err != nil {
@@ -349,8 +352,8 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, gtdArr
 
 		// Merge metadata with any metadata in the cache to pass to evaluators
 		mergedMetadata := td.Metadata.DeepCopy()
-
-		if cachedData, ok := asp.traceData.Get(id); ok {
+		cachedData, hasCachedData := asp.traceData.Get(id)
+		if hasCachedData {
 			mergedMetadata.MergeWith(cachedData.Metadata)
 		}
 
@@ -366,7 +369,7 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, gtdArr
 		case evaluators.Sampled:
 			// Sample, cache decision, and release all data associated with the trace
 			asp.sampledDecisionCache.Put(id, time.Now())
-			if cachedData, ok := asp.traceData.Get(id); ok {
+			if hasCachedData {
 				cachedTraces, gtErr := cachedData.GetTraces()
 				if gtErr != nil {
 					asp.reportTraceDataErr(ctx, gtErr, int64(td.Metadata.SpanCount), zap.String(traceIDLoggingKey, hex.EncodeToString(id[:])))
@@ -390,12 +393,12 @@ func (asp *atlassianSamplingProcessor) processTraces(ctx context.Context, gtdArr
 			}
 			// If we have reached here, the sampling decision is still pending, so we put trace data in the cache
 			// Priority of the metadata will affect the cache tier
-			if cachedTd, ok := asp.traceData.Get(id); ok {
-				tdErr := cachedTd.AbsorbTraceData(td) // chooses higher priority in merge
+			if hasCachedData {
+				tdErr := cachedData.AbsorbTraceData(td) // chooses higher priority in merge
 				if tdErr != nil {
 					asp.reportTraceDataErr(ctx, tdErr, int64(td.Metadata.SpanCount), zap.String(traceIDLoggingKey, hex.EncodeToString(id[:])))
 				}
-				td = cachedTd // td is now the initial, incoming td + the cached td
+				td = cachedData // td is now the initial, incoming td + the cached td
 			}
 			asp.traceData.Put(id, td)
 		}
@@ -416,7 +419,8 @@ func (asp *atlassianSamplingProcessor) earlyDecisionChecks(ctx context.Context, 
 
 		if decisionFromCache == evaluators.Sampled {
 			tracesToExport := ptrace.NewTraces()
-			appendToTraces(tracesToExport, resource, spans)
+			appendAndMoveToTraces(tracesToExport, resource, spans)
+			spans = nil //nolint:ineffassign // defensive nil assignment after data has been moved
 			asp.sendSampledTraceData(ctx, tracesToExport)
 			delete(spansByTraceID, id)
 		} else if decisionFromCache == evaluators.NotSampled {
@@ -444,7 +448,8 @@ func (asp *atlassianSamplingProcessor) cachedDecision(
 			// there won't be anymore cache accesses that must be synchronized.
 			go func() {
 				td := ptrace.NewTraces()
-				appendToTraces(td, resource, spans)
+				appendAndMoveToTraces(td, resource, spans)
+				spans = nil
 				asp.sendSampledTraceData(context.Background(), td)
 			}()
 		}

@@ -39,23 +39,34 @@ func groupSpansByTraceID(resourceSpans ptrace.ResourceSpans) spansGroupedByTrace
 	return idToSpans
 }
 
-func appendToTraces(dest ptrace.Traces, resource pcommon.Resource, spanAndScopes []spanAndScope) {
+// appendAndMoveToTraces appends the given spans onto dest, grouped under a single
+// ResourceSpans for the given resource.
+//
+// IMPORTANT - DO NOT USE spanAndScopes after calling this method.
+// This function MOVES each *ptrace.Span out of spanAndScopes into dest.
+//
+// The Resource and InstrumentationScope are shared across different trace IDs
+// from the same incoming ResourceSpans so they must be copied instead of moved.
+func appendAndMoveToTraces(dest ptrace.Traces, resource pcommon.Resource, spanAndScopes []spanAndScope) {
 	rs := dest.ResourceSpans().AppendEmpty()
 	resource.CopyTo(rs.Resource())
 
 	scopePointerToNewScope := make(map[*pcommon.InstrumentationScope]*ptrace.ScopeSpans)
-	for _, spanAndScope := range spanAndScopes {
+	for i := range spanAndScopes {
+		ss := &spanAndScopes[i]
 		// If the scope of the spanAndScope is not in the map, add it to the map and the destination.
-		if scope, ok := scopePointerToNewScope[spanAndScope.instrumentationScope]; !ok {
+		if scope, ok := scopePointerToNewScope[ss.instrumentationScope]; !ok {
 			is := rs.ScopeSpans().AppendEmpty()
-			spanAndScope.instrumentationScope.CopyTo(is.Scope())
-			scopePointerToNewScope[spanAndScope.instrumentationScope] = &is
+			ss.instrumentationScope.CopyTo(is.Scope())
+			scopePointerToNewScope[ss.instrumentationScope] = &is
 
 			sp := is.Spans().AppendEmpty()
-			spanAndScope.span.CopyTo(sp)
+			ss.span.MoveTo(sp)
 		} else {
 			sp := scope.Spans().AppendEmpty()
-			spanAndScope.span.CopyTo(sp)
+			ss.span.MoveTo(sp)
 		}
+		// the span is moved - explicitly nil it out to loudly prevent access
+		ss.span = nil
 	}
 }

@@ -9,6 +9,9 @@ status:
 
 tests:
 
+# Automatically added for v0.153 upgrade; review as needed
+reaggregation_enabled: false
+
 telemetry:
   metrics:
     processor_atlassian_sampling_cache_reads:

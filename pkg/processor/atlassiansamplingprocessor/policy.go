@@ -18,6 +18,9 @@ type policy struct {
 	emitSingleSpanForNotSampled bool
 	// evaluator that decides if a trace is sampled or not by this policy instance.
 	evaluator evaluators.PolicyEvaluator
+	// recordDecisionFrom is an optional resource attribute key whose value is included
+	// as a metric attribute on the policy_decisions metric for decisive evaluations.
+	recordDecisionFrom string
 }
 
 func newPolicies(cfg []PolicyConfig, set component.TelemetrySettings) ([]*policy, error) {
@@ -40,6 +43,7 @@ func newPolicies(cfg []PolicyConfig, set component.TelemetrySettings) ([]*policy
 			policyType:                  policyCfg.Type,
 			emitSingleSpanForNotSampled: policyCfg.EmitSingleSpanForNotSampled,
 			evaluator:                   eval,
+			recordDecisionFrom:          policyCfg.RecordDecisionFrom,
 		}
 		pols[i] = p
 	}
