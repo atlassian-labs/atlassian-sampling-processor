@@ -19,7 +19,12 @@ atlassian_sampling:
       {
         name: test-policy-2,
         type: and,
-        record_decision_from: service.name,
+        record_decision_from: {
+          res_attr_key: service.name,
+          mappings: [
+            { pattern: "^(conf|confluence)-.*", value: "confluence-monolith" },
+          ]
+        },
         and: {
           and_sub_policy:
             [

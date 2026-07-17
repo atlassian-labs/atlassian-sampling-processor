@@ -32,6 +32,7 @@ func setupTestPolicies() testPols {
 		"alwaysPending":              alwaysPending(),
 		"alwaysSample":               alwaysSample(),
 		"alwaysSampleWithRecordFrom": alwaysSampleWithRecordFrom(),
+		"alwaysSampleWithGrouping":   alwaysSampleWithGrouping(),
 		"hardNotSampled":             hardNotSampled(),
 		"alwaysLowPriority":          alwaysLowPriority(),
 		"alwaysError":                alwaysError(),
@@ -195,6 +196,19 @@ func TestMakeDecision(t *testing.T) {
 				policyDecisionDP(testPols.Policies["alwaysSampleWithRecordFrom"].name, evaluators.Sampled, "my-service"),
 			},
 		},
+		{
+			name: "decisionGrouper collapses high-cardinality decision_from",
+			policies: []*policy{
+				testPols.Policies["alwaysPending"],
+				testPols.Policies["alwaysSampleWithGrouping"],
+			},
+			traces:         newTraceWithService("confluence-shard-0042"),
+			expectDecision: evaluators.Sampled,
+			expectPolicy:   testPols.Policies["alwaysSampleWithGrouping"],
+			expectDataPoints: []metricdata.DataPoint[int64]{
+				policyDecisionDP(testPols.Policies["alwaysSampleWithGrouping"].name, evaluators.Sampled, "confluence-monolith"),
+			},
+		},
 	}
 
 	mergedMetadata := &tracedata.Metadata{}
@@ -340,6 +354,22 @@ func alwaysSampleWithRecordFrom() *policy {
 		evaluator:          evaluators.NewProbabilisticSampler("", 100.0),
 		policyType:         Probabilistic,
 		recordDecisionFrom: "service.name",
+	}
+}
+
+func alwaysSampleWithGrouping() *policy {
+	grouper, err := newDecisionGrouper([]DecisionMapping{
+		{Pattern: "^(conf|confluence)-.*", Value: "confluence-monolith"},
+	})
+	if err != nil {
+		panic(err)
+	}
+	return &policy{
+		name:               "returns Sampled with grouping " + strconv.FormatUint(uint64(rand.Uint32()), 16),
+		evaluator:          evaluators.NewProbabilisticSampler("", 100.0),
+		policyType:         Probabilistic,
+		recordDecisionFrom: "service.name",
+		decisionGrouper:    grouper,
 	}
 }
 

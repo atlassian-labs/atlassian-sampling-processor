@@ -7,6 +7,7 @@
 package atlassiansamplingprocessor
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -64,7 +65,12 @@ func TestLoadConfig(t *testing.T) {
 						Name: "test-policy-2",
 						Type: "and",
 					},
-					RecordDecisionFrom: "service.name",
+					RecordDecisionFrom: &RecordDecisionFrom{
+						ResAttrKey: "service.name",
+						Mappings: []DecisionMapping{
+							{Pattern: "^(conf|confluence)-.*", Value: "confluence-monolith"},
+						},
+					},
 					AndConfig: AndConfig{
 						SubPolicyCfg: []AndSubPolicyConfig{
 							{
@@ -314,6 +320,79 @@ func TestValidate(t *testing.T) {
 				},
 			},
 			expectedError: duplicatePolicyName,
+		},
+		{
+			name: "Valid record_decision_from with mappings",
+			c: &Config{
+				PrimaryCacheSize:   100,
+				SecondaryCacheSize: 10,
+				Shards:             1,
+				PolicyConfig: []PolicyConfig{
+					{
+						SharedPolicyConfig: SharedPolicyConfig{Name: "p1", Type: Probabilistic},
+						RecordDecisionFrom: &RecordDecisionFrom{
+							ResAttrKey: "service.name",
+							Mappings: []DecisionMapping{
+								{Pattern: "^confluence-.*", Value: "confluence-monolith"},
+							},
+						},
+					},
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name: "Invalid record_decision_from regex",
+			c: &Config{
+				PrimaryCacheSize:   100,
+				SecondaryCacheSize: 10,
+				Shards:             1,
+				PolicyConfig: []PolicyConfig{
+					{
+						SharedPolicyConfig: SharedPolicyConfig{Name: "p1", Type: Probabilistic},
+						RecordDecisionFrom: &RecordDecisionFrom{
+							ResAttrKey: "service.name",
+							Mappings:   []DecisionMapping{{Pattern: "([", Value: "x"}},
+						},
+					},
+				},
+			},
+			expectedError: errors.New("invalid regex"),
+		},
+		{
+			name: "Empty record_decision_from mapping pattern",
+			c: &Config{
+				PrimaryCacheSize:   100,
+				SecondaryCacheSize: 10,
+				Shards:             1,
+				PolicyConfig: []PolicyConfig{
+					{
+						SharedPolicyConfig: SharedPolicyConfig{Name: "p1", Type: Probabilistic},
+						RecordDecisionFrom: &RecordDecisionFrom{
+							ResAttrKey: "service.name",
+							Mappings:   []DecisionMapping{{Pattern: "", Value: "x"}},
+						},
+					},
+				},
+			},
+			expectedError: errors.New("empty pattern"),
+		},
+		{
+			name: "Empty record_decision_from res_attr_key",
+			c: &Config{
+				PrimaryCacheSize:   100,
+				SecondaryCacheSize: 10,
+				Shards:             1,
+				PolicyConfig: []PolicyConfig{
+					{
+						SharedPolicyConfig: SharedPolicyConfig{Name: "p1", Type: Probabilistic},
+						RecordDecisionFrom: &RecordDecisionFrom{
+							Mappings: []DecisionMapping{{Pattern: "^conf-.*", Value: "conf"}},
+						},
+					},
+				},
+			},
+			expectedError: errors.New("empty res_attr_key"),
 		},
 	}
 	for _, tc := range testCases {

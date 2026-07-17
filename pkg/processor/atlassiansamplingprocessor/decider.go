@@ -65,6 +65,9 @@ func (d *decider) MakeDecision(ctx context.Context, id pcommon.TraceID, currentT
 			}
 			if decision == evaluators.Sampled || decision == evaluators.NotSampled {
 				decisionFrom := extractResourceAttribute(currentTrace, p.recordDecisionFrom)
+				if p.decisionGrouper != nil {
+					decisionFrom = p.decisionGrouper.group(decisionFrom)
+				}
 				attrs = append(attrs, attribute.String("decision_from", decisionFrom))
 			}
 			d.telemetry.ProcessorAtlassianSamplingPolicyDecisions.Add(ctx, 1, metric.WithAttributeSet(attribute.NewSet(attrs...)))

@@ -2,6 +2,8 @@ package atlassiansamplingprocessor // import "github.com/atlassian-labs/atlassia
 
 import (
 	"errors"
+	"fmt"
+	"regexp"
 	"time"
 
 	"go.opentelemetry.io/collector/component"
@@ -104,7 +106,37 @@ func (cfg *Config) Validate() (errors error) {
 		errors = multierr.Append(errors, err)
 	}
 
+	if err := validateRecordDecisionFrom(cfg.PolicyConfig); err != nil {
+		errors = multierr.Append(errors, err)
+	}
+
 	return errors
+}
+
+func validateRecordDecisionFrom(policies []PolicyConfig) (errs error) {
+	for _, policy := range policies {
+		rdf := policy.RecordDecisionFrom
+		if rdf == nil {
+			continue
+		}
+		if rdf.ResAttrKey == "" {
+			errs = multierr.Append(errs, fmt.Errorf(
+				"policy %q: record_decision_from.res_attr_key must not be empty", policy.Name))
+		}
+		for i, m := range rdf.Mappings {
+			if m.Pattern == "" {
+				errs = multierr.Append(errs, fmt.Errorf(
+					"policy %q: record_decision_from.mappings[%d].pattern must not be empty", policy.Name, i))
+				continue
+			}
+			if _, err := regexp.Compile(m.Pattern); err != nil {
+				errs = multierr.Append(errs, fmt.Errorf(
+					"policy %q: record_decision_from.mappings[%d].pattern %q is not a valid regex: %w",
+					policy.Name, i, m.Pattern, err))
+			}
+		}
+	}
+	return errs
 }
 
 func validateUniquePolicyNames(policies []PolicyConfig) error {
