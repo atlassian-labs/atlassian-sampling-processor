@@ -106,6 +106,10 @@ Policies include a `name`, `type`, and then further configuration depending on w
 `emit_single_span_for_not_sampled` is an optional field that can be set to `true` for a policy. If set, the processor will emit a single span for a trace that is not sampled, instead of dropping the trace entirely. 
 This span will have the same trace ID as the original trace. The span will have the name `TRACE NOT SAMPLED`, with policy name in its attribute.
 
+`record_decision_from` is an optional object (`res_attr_key` plus optional `mappings`) that records the given resource attribute as the 
+`decision_from` label on the `policy_decisions` metric.  You can use this to determine which resources are triggering which policies.
+Use `mappings` to collapse high-cardinality values, e.g. `myservice_shard-0001` → `myservice`; unmatched values are emitted unchanged.
+
 Current supported policy types are: 
 
 - `span_count` - samples the trace if it meets a minimum amount of spans. 

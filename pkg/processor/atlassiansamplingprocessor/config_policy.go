@@ -23,11 +23,31 @@ type PolicyConfig struct {
 
 	DowngraderConfig DowngraderConfig `mapstructure:"downgrader"`
 
-	// RecordDecisionFrom is an optional resource attribute key to be used
+	// RecordDecisionFrom is an optional configuration to be used
 	// for tracking which resources are causing Sampled/NotSampled decisions.
 	// For example, you may have a policy that matches from many services,
-	// setting RecordDecisionFrom to 'service.name' will enrich the telemetry with that info.
-	RecordDecisionFrom string `mapstructure:"record_decision_from"`
+	// setting RecordDecisionFrom.ResAttrKey to 'service.name' will enrich the telemetry with that info.
+	RecordDecisionFrom *RecordDecisionFrom `mapstructure:"record_decision_from"`
+}
+
+// RecordDecisionFrom configures which resource attribute is recorded as the "decision_from"
+// metric attribute, and optionally how its value is normalized to bound cardinality.
+type RecordDecisionFrom struct {
+	// ResAttrKey is the resource attribute key whose value is recorded.
+	ResAttrKey string `mapstructure:"res_attr_key"`
+
+	// Mappings is an optional ordered list of regex-to-value rewrites. The first mapping
+	// whose pattern matches the extracted value determines the emitted value. If no
+	// mapping matches, the original extracted value is emitted unchanged.
+	Mappings []DecisionMapping `mapstructure:"mappings"`
+}
+
+// DecisionMapping is a single regex-to-value rewrite rule used by RecordDecisionFrom.
+type DecisionMapping struct {
+	// Pattern is a Go regular expression matched against the extracted value.
+	Pattern string `mapstructure:"pattern"`
+	// Value is the value emitted when Pattern matches.
+	Value string `mapstructure:"value"`
 }
 
 // SharedPolicyConfig holds the common configuration to all policies that are used in derivative policy configurations
